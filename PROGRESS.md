@@ -92,16 +92,52 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 3a — Sesje i logowanie `[ ]`
+## Krok 3a — Sesje i logowanie `[x]`
 
-- [ ] Model `Session`, cookie httpOnly/sameSite/secure, 8 h rolling
-- [ ] bcrypt cost 12, logowanie, wylogowanie
-- [ ] Rate limit 5 prób / 15 min per email
-- [ ] `/change-password` przy `mustChangePassword`
+- [x] Model `Session`, cookie httpOnly/sameSite/secure, 8 h rolling
+- [x] bcrypt cost 12, logowanie, wylogowanie
+- [x] Rate limit 5 prób / 15 min per email
+- [x] `/change-password` przy `mustChangePassword`
 
 ### Decyzje
+- **Nowe zależności (zatwierdzone):** `zod` (walidacja server actions — wymóg sekcji 2),
+  `bcryptjs` (czysto-JS bcrypt, bez natywnej kompilacji na alpine), `@types/bcryptjs` (dev).
+- **Middleware = lekka brama na Edge** (tylko obecność cookie): brak cookie + trasa niepubliczna
+  → redirect `/login`; slide ważności cookie 8 h. **Pełna walidacja sesji** (podpis HMAC,
+  wygaśnięcie, `isActive`) i **redirect przy `mustChangePassword`** są server-side
+  (`getSessionUser()` + layout grupy `(app)`), bo Prisma nie działa w runtime Edge.
+  „Już zalogowany na /login" rozstrzyga strona `/login` server-side (unika pętli przy nieważnym cookie).
+- **Rolling refresh dwupoziomowy:** cookie w przeglądarce przesuwa middleware (co request);
+  `Session.expiresAt` w bazie odświeża `getSessionUser()` z throttlingiem ~1 h (nie zapisuje
+  cookie — RSC nie może; zapis cookie tylko w Server Action/Route Handler/middleware).
+- **Cookie sesji podpisane HMAC-SHA256** przez `SESSION_SECRET` (wartość = `sessionId.hmac`);
+  `SESSION_COOKIE` wydzielone do lekkiego `lib/auth/cookie.ts`, żeby middleware nie ciągnął Prismy.
+- **Neutralny komunikat** logowania („Nieprawidłowy email lub hasło") jednakowy dla:
+  brak konta / złe hasło / `isActive=false`. Rate limit liczy nieudane próby, sukces resetuje.
+- **Grupa tras `(app)`** ze strażnikiem w layoucie; `/` przeniesione do `app/(app)/page.tsx`.
+  `/login`, `/health` publiczne (`/health` musi być poza auth dla probe'ów). `getSessionUser`
+  owinięte `react.cache` (dedup w obrębie renderu).
+
 ### Odłożone
+- `requireRole()` i pełna ochrona per rola, test „PM → 403", unieważnianie sesji przy
+  `isActive=false` → **krok 3b** (helper `destroyAllUserSessions` już jest, użyty przez zmianę hasła).
+- Równoważenie czasu odpowiedzi przy nieistniejącym userze (dummy bcrypt) — pominięte
+  (7 użytkowników, sieć wewnętrzna); do rozważenia, nie krytyczne.
+- Realni użytkownicy → seed w kroku 4 (tu testowano jednorazowym userem, usuniętym po weryfikacji).
+
 ### Jak sprawdzić
+- Zaloguj się userem z `mustChangePassword` → redirect na `/change-password`, reszta zablokowana
+- Zmień hasło → wylogowanie ze wszystkich sesji, `/login?changed=1`, logowanie nowym hasłem
+- Złe hasło → neutralny błąd; 6. próba w 15 min → „Zbyt wiele prób logowania"
+- Wyloguj → cookie i rekord `Session` skasowane, powrót na `/login`
+
+**Zweryfikowane w tej sesji (przeglądarka, lokalny `next start` + baza w kontenerze):**
+- Pełny flow: login (mustChange) → `/change-password` → zmiana hasła → `/login?changed=1`
+  → login nowym hasłem → `/` „Zalogowano jako Test Admin (ADMIN)" → logout → `/login`. ✓
+- Neutralny błąd przy złym haśle; 6. próba zablokowana rate-limitem. ✓
+- Middleware: `GET /` bez cookie → 307 `/login`; `/login`, `/health` → 200 (lokalnie i w kontenerze).
+- `npm run check` i `npm run build` przechodzą; `docker compose up --build` startuje
+  (entrypoint „No pending migrations to apply", Ready), trasy w kontenerze OK.
 
 ---
 
