@@ -53,17 +53,42 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 2 — Schema Prisma `[ ]`
+## Krok 2 — Schema Prisma `[x]`
 
-- [ ] Wszystkie enumy i modele wg sekcji 3 promptu
-- [ ] Unique constraints: `Version.name`, `[versionId, instanceId]`, `[versionId, taskTemplateId]`
-- [ ] `onDelete: Restrict` na wszystkich relacjach do `User`
-- [ ] Pierwsza migracja
+- [x] Wszystkie enumy i modele wg sekcji 3 promptu
+- [x] Unique constraints: `Version.name`, `[versionId, instanceId]`, `[versionId, taskTemplateId]`
+- [x] `onDelete: Restrict` na wszystkich relacjach do `User`
+- [x] Pierwsza migracja (`20260730152112_init`)
 
 ### Decyzje
+- **Nazwane relacje** wszędzie, gdzie User wskazuje wielokrotnie na ten sam model
+  (`CreatedVersions`/`StatusChangedVersions`) oraz dla inverse-relations z komentarza sekcji 3
+  (`CompletedTasks`, `UpdatedTestRuns`, `Comments`, `ChangeLogs`) — bez nich schema się nie waliduje.
+- **`onDelete` jawnie na każdej relacji.** Zweryfikowane w żywej bazie: 8× RESTRICT (wszystkie
+  relacje do `User` poza sesją + `VersionTask.taskTemplate` + `InstanceTestRun.instance`),
+  4× CASCADE (`Session.user` — wyjątek z sekcji 3, oraz 3 relacje do `Version`).
+- **`InstanceTestRun.instance` = RESTRICT** — decyzja nieopisana w sekcji 3, zatwierdzona przez
+  użytkownika (Instance nigdy nie jest kasowana; odpinanie przez `excludedAt`).
+- **`ChangeLog.versionId` jako skalar bez relacji** (denormalizacja pod filtrowanie).
+- **Enumy rozpisane po jednej wartości na linię** — kompaktowy zapis z promptu (`{ A B C }`)
+  jest niepoprawny w Prisma i nie przechodzi walidacji.
+- **`prisma` przeniesione do `dependencies`** (z dev): CLI jest realnie potrzebne w runtime do
+  `migrate deploy` w entrypoincie. Dockerfile: nowy stage `proddeps` (`npm ci --omit=dev`) daje
+  domknięty graf zależności CLI (m.in. `effect`, którego brakowało przy cherry-picku `node_modules/prisma`).
+
 ### Odłożone
+- Snapshoty (`*Snapshot`) i logika zamrażania wersji — to krok 5, tu tylko pola w schemacie.
+- Seed danych → krok 4.
+
 ### Jak sprawdzić
 - `npx prisma studio` → wszystkie tabele obecne, próba wstawienia duplikatu nazwy wersji odrzucona
+
+**Zweryfikowane w tej sesji:**
+- `npx prisma migrate dev --name init` — migracja utworzona i zastosowana; `npm run check` przechodzi.
+- `docker compose down -v && up --build` (czysty volume) → entrypoint: „Applying migration
+  `20260730152112_init` … All migrations have been successfully applied", serwer Ready, `/health` → 200.
+- Baza: 9 tabel modeli + `_prisma_migrations`. Unikalne indeksy obecne: `Version_name_key`,
+  `User_email_key`, `InstanceTestRun_versionId_instanceId_key`, `VersionTask_versionId_taskTemplateId_key`.
 
 ---
 

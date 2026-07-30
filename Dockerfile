@@ -20,6 +20,14 @@ COPY . .
 RUN npx prisma generate
 RUN npm run build
 
+# --- proddeps: tylko produkcyjne zależności (zawiera CLI `prisma` z pełnym
+#     grafem zależności, potrzebnym do `migrate deploy` w runtime) ---
+FROM base AS proddeps
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+RUN npm ci --omit=dev
+
 # --- runner: minimalny runtime, użytkownik non-root ---
 FROM base AS runner
 WORKDIR /app
@@ -31,10 +39,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Prisma CLI + silniki + schema — potrzebne do `migrate deploy` w entrypoincie
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# Pełny prod-owy node_modules (CLI Prismy + @prisma/client + silniki) na wierzchu
+# okrojonego node_modules ze standalone — daje domknięty graf zależności dla
+# `prisma migrate deploy` uruchamianego w entrypoincie.
+COPY --from=proddeps /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

@@ -6,3 +6,195 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+enum Role {
+  TESTER
+  PM
+  ADMIN
+}
+
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum VersionStatus {
+  IN_PROGRESS
+  RELEASED
+  CANCELLED
+}
+
+enum TaskType {
+  CHECKBOX
+  TICKET_AGGREGATE
+  INSTANCE_AGGREGATE
+}
+
+enum DeadlineType {
+  FLEXIBLE
+  DAYS_BEFORE_RELEASE
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
+model User {
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  passwordHash       String
+  name               String
+  role               Role
+  isActive           Boolean  @default(true)
+  mustChangePassword Boolean  @default(true)
+  theme              Theme    @default(SYSTEM)
+  createdAt          DateTime @default(now())
+
+  sessions              Session[]
+  createdVersions       Version[]         @relation("CreatedVersions")
+  statusChangedVersions Version[]         @relation("StatusChangedVersions")
+  completedTasks        VersionTask[]     @relation("CompletedTasks")
+  updatedTestRuns       InstanceTestRun[] @relation("UpdatedTestRuns")
+  comments              VersionComment[]  @relation("Comments")
+  changeLogs            ChangeLog[]       @relation("ChangeLogs")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Version {
+  id                String        @id @default(cuid())
+  name              String        @unique
+  releaseDate       DateTime      @db.Date
+  status            VersionStatus @default(IN_PROGRESS)
+  createdById       String
+  statusChangedById String?
+  statusChangedAt   DateTime?
+  cancelReason      String?
+  createdAt         DateTime      @default(now())
+
+  createdBy       User  @relation("CreatedVersions", fields: [createdById], references: [id], onDelete: Restrict)
+  statusChangedBy User? @relation("StatusChangedVersions", fields: [statusChangedById], references: [id], onDelete: Restrict)
+
+  tasks    VersionTask[]
+  testRuns InstanceTestRun[]
+  comments VersionComment[]
+
+  @@index([status, releaseDate])
+}
+
+model TaskTemplate {
+  id                String       @id @default(cuid())
+  name              String
+  description       String?
+  taskType          TaskType
+  deadlineType      DeadlineType
+  daysBeforeRelease Int?
+  sortOrder         Int
+  isActive          Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+
+  versionTasks VersionTask[]
+}
+
+model VersionTask {
+  id             String     @id @default(cuid())
+  versionId      String
+  taskTemplateId String
+  status         TaskStatus @default(NOT_STARTED)
+
+  manualCounterCurrent Int @default(0)
+  manualCounterTotal   Int @default(0)
+
+  completedById String?
+  completedAt   DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  nameSnapshot              String?
+  descriptionSnapshot       String?
+  taskTypeSnapshot          TaskType?
+  deadlineTypeSnapshot      DeadlineType?
+  daysBeforeReleaseSnapshot Int?
+  sortOrderSnapshot         Int?
+
+  version      Version      @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  taskTemplate TaskTemplate @relation(fields: [taskTemplateId], references: [id], onDelete: Restrict)
+  completedBy  User?        @relation("CompletedTasks", fields: [completedById], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, taskTemplateId])
+}
+
+model Instance {
+  id                 String   @id @default(cuid())
+  name               String
+  clientName         String?
+  keyFunctionalities String
+  isActive           Boolean  @default(true)
+  createdAt          DateTime @default(now())
+
+  testRuns InstanceTestRun[]
+}
+
+model InstanceTestRun {
+  id         String @id @default(cuid())
+  versionId  String
+  instanceId String
+
+  environmentRestored Boolean @default(false)
+  dbScriptsInstalled  Boolean @default(false)
+  backendUpdated      Boolean @default(false)
+  testsCompleted      Boolean @default(false)
+
+  notes       String?
+  excludedAt  DateTime?
+  updatedAt   DateTime  @updatedAt
+  updatedById String?
+
+  version   Version  @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  instance  Instance @relation(fields: [instanceId], references: [id], onDelete: Restrict)
+  updatedBy User?    @relation("UpdatedTestRuns", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, instanceId])
+  @@index([versionId, excludedAt])
+}
+
+model VersionComment {
+  id        String   @id @default(cuid())
+  versionId String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  version Version @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  author  User    @relation("Comments", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([versionId, createdAt])
+}
+
+model ChangeLog {
+  id         String   @id @default(cuid())
+  entityType String
+  entityId   String
+  versionId  String?
+  field      String
+  oldValue   String?
+  newValue   String?
+  userId     String
+  createdAt  DateTime @default(now())
+
+  user User @relation("ChangeLogs", fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([versionId, createdAt])
+  @@index([entityType, entityId, field, createdAt])
+}
