@@ -181,17 +181,39 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 4 — Seed `[ ]`
+## Krok 4 — Seed `[x]`
 
-- [ ] 1 ADMIN, 2 TESTER, 1 PM (`mustChangePassword: false`, hasła w README)
-- [ ] 6 `TaskTemplate` — po dwa każdego typu
-- [ ] 5 `Instance`, w tym jedna bez `clientName`
-- [ ] Idempotentny (`upsert`), `npm run seed`
+- [x] 1 ADMIN, 2 TESTER, 1 PM (`mustChangePassword: false`, hasła w README)
+- [x] 6 `TaskTemplate` — po dwa każdego typu
+- [x] 5 `Instance`, w tym jedna bez `clientName`
+- [x] Idempotentny (`upsert`), `npm run seed`
 
 ### Decyzje
+- **Runner: `tsx`** (nowa dev-zależność, zatwierdzona). Skrypt
+  `seed` = `node --env-file=.env --import tsx prisma/seed.ts` (ładuje `DATABASE_URL` z `.env`).
+- **Idempotencja przez `update: {}`** (create-if-absent): ponowny seed nie nadpisuje istniejących
+  danych, nie re-hashuje haseł, nie klobruje ewentualnych zmian. Użytkownicy upsertowani po `email`
+  (`@unique`); `TaskTemplate`/`Instance` **nie mają unikatu** (sekcja 3), więc nadałem im
+  deterministyczne `id` (`seed-tpl-*`, `seed-inst-*`) i upsertuję po `id`. Schemy nie zmieniałem.
+- Hasło dev `Dev12345!` (jedno, wspólne), hashowane przez `hashPassword` (bcrypt cost 12).
+  Konta w README, z notką, że to wartości deweloperskie.
+- Seed **poza** entrypointem Dockera (sekcja 10) — komenda lokalna przeciw bazie w kontenerze.
+
 ### Odłożone
+- `Instance.name`/`TaskTemplate.name` bez `@unique` — pod import CSV „po name" (krok 8) może być
+  potrzebny unikat albo inna strategia upsertu; decyzja w kroku 8, nie ruszam schematu teraz.
+- Seedowanie bazy produkcyjnej (na VM) — poza zakresem; ten sam skrypt przeciw prod `DATABASE_URL`.
+
 ### Jak sprawdzić
 - Dwukrotne uruchomienie seeda nie tworzy duplikatów
+
+**Zweryfikowane w tej sesji:**
+- `npm run seed` ×2 → identyczne liczby (users=4, taskTemplates=6, instances=5) — idempotentne.
+- Rozkład: role 2×TESTER / 1×PM / 1×ADMIN; typy szablonów 2× każdy; 1 instancja bez `clientName`.
+- `bcrypt.compare('Dev12345!', hash)` = true; logowanie `admin@releasehub.local` tworzy ważną sesję
+  (POST /login → 303, `mustChangePassword=false` → `/`). `npm run check` przechodzi.
+- Uwaga narzędziowa: pane przeglądarki nie kompozytuje klatek w tej sesji (screenshot/redirect-follow
+  padają `ERR_ABORTED`) — dowód logowania oparty na sesji w bazie + kodzie odpowiedzi, nie na UI.
 
 ---
 
