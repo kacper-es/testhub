@@ -141,16 +141,43 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 3b — Autoryzacja `[ ]`
+## Krok 3b — Autoryzacja `[x]`
 
-- [ ] `requireRole()` + middleware chroniący ścieżki
-- [ ] Unieważnianie sesji przy zmianie hasła i `isActive = false`
-- [ ] Test: PM dostaje odmowę z server action
+- [x] `requireRole()` + ochrona ścieżek (server-side, nie Edge — patrz decyzje)
+- [x] Unieważnianie sesji przy zmianie hasła (3a) i mechanizm dla `isActive=false`
+- [x] Test PM dostaje odmowę — unit `assertRole` (żywy test na realnej akcji → krok 5)
 
 ### Decyzje
+- **`lib/auth/roles.ts` (czysta logika):** `AuthorizationError`, `assertRole(user, roles)` —
+  rzuca gdy brak usera / `!isActive` / rola spoza listy. Bez importów `next/headers`/Prisma,
+  więc testowalna jednostkowo bez mocków.
+- **`lib/auth/authz.ts` (server):** `requireRole(roles)` (dla server actions/route handlerów —
+  rzuca → mutacja odrzucona), `requireUser()` (strony — redirect `/login`),
+  `requireRolePage(roles)` (strony per rola — redirect `/` przy złej roli, pod przyszłe `/admin`).
+- **Ochrona per rola jest server-side, nie w middleware.** Świadome odstępstwo od dosłownego
+  „middleware chroniący ścieżki per rola": Prisma nie działa na Edge, więc rola sprawdzana
+  w `requireRole`/`requireRolePage`. Middleware zostaje bramą „zalogowany/nie" (z 3a).
+- **`isActive=false`:** `getSessionUser()` już odrzuca nieaktywnych (test to potwierdza).
+  Fizyczne kasowanie ich sesji zrobi akcja dezaktywacji w panelu admina (krok 9) przez istniejący
+  `destroyAllUserSessions` — nie dokładam osieroconego helpera bez wywołania.
+- **Vitest przypięty do `^3` (3.2.7)**, nie 4.x: lokalny Node to v21.2.0 (non-LTS), a Vitest 4
+  (rolldown) wymaga `node:util.styleText` niedostępnego w tym runtime. Docker i tak używa node:22.
+  `authz.test.ts` w `tests/`, alias `@` w `vitest.config.ts`. Skrypt `npm test` = `vitest run`.
+
 ### Odłożone
+- **Żywy dowód „PM → 403 z DevTools na realnej akcji"** → krok 5 (pierwsza mutująca akcja
+  domenowa + zaseedowany PM). Mechanizm (`requireRole`) i logika (`assertRole`) gotowe i przetestowane.
+- Druga część `authz.test.ts` — „mutacja na zamkniętej wersji odrzucona" → krok 6c (gdy istnieją wersje).
+- Akcja dezaktywacji konta (`isActive=false` + kasowanie sesji) → krok 9.
+
 ### Jak sprawdzić
-- Zaloguj się jako PM, wywołaj mutującą akcję z DevToolsów → odmowa, brak zmiany w bazie
+- `npx vitest run` → `authz.test.ts` zielony (PM odrzucony, TESTER/ADMIN dopuszczeni, brak usera
+  i nieaktywny odrzuceni)
+- (od kroku 5) Zaloguj się jako PM, wywołaj mutującą akcję z DevToolsów → odmowa, brak zmiany w bazie
+
+**Zweryfikowane w tej sesji:**
+- `npx vitest run` → 4/4 zielone; `npm run check` przechodzi.
+- `docker compose up --build` startuje (Ready); `/` bez cookie → 307 `/login`, `/login` → 200.
 
 ---
 
