@@ -6,18 +6,50 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 1 — Setup projektu `[ ]`
+## Krok 1 — Setup projektu `[x]`
 
-- [ ] Next.js App Router + TypeScript + Tailwind
-- [ ] Prisma + połączenie z Postgresem
-- [ ] docker-compose: app + postgres, healthcheck, named volume, non-root
-- [ ] `.env.example`, `npm run check`
+- [x] Next.js App Router + TypeScript + Tailwind
+- [x] Prisma + połączenie z Postgresem
+- [x] docker-compose: app + postgres, healthcheck, named volume, non-root
+- [x] `.env.example`, `npm run check`
 
 ### Decyzje
+- Wersje: Next 15.5, React 19.2, Prisma 6.19, Tailwind 3.4, ESLint 9.39, TypeScript 5.9.
+- Bootstrap Prismy bez modeli: `prisma/schema.prisma` zawiera tylko `datasource` + `generator`.
+  Modele i pierwsza migracja dochodzą w kroku 2 (pokażę diff).
+- Połączenie z bazą dowodzone stroną `/health` (`prisma.$queryRaw\`SELECT 1\``) z
+  `export const dynamic = 'force-dynamic'` — bez tego `next build` próbowałby prerenderować
+  stronę w warstwie builder (brak bazy) i build by padł.
+- Tailwind v3 (klasyczny `tailwind.config` mapujący tokeny — zgodnie z sekcją 9.1). Tokeny/motywy: krok 4.5.
+- ESLint 9 → flat config (`eslint.config.mjs` + `FlatCompat` z `next/core-web-vitals`).
+- Entrypoint: warunek na istnienie i niepustość `prisma/migrations` przed `migrate deploy`
+  (zamiast `|| true`). Zweryfikowane: w kroku 1 loguje „No migrations yet — skipping migrate deploy",
+  od kroku 2 realny błąd migracji zatrzyma start kontenera. `migrate deploy` wołany przez
+  `node ./node_modules/prisma/build/index.js` (bez zależności od npx/network w runtime).
+- `postinstall: prisma generate` w `package.json` — klient generuje się po `npm ci`; Dockerfile
+  deps stage kopiuje `prisma/` przed `npm ci`.
+- `docker-compose.yml`: `DATABASE_URL` jawnie w `environment:` app z hostem `db`, nadpisuje
+  `localhost` z `.env` (ten służy tylko lokalnym `prisma migrate dev` / `npm run check`).
+- `.gitignore`: dodane `next-env.d.ts` i `*.tsbuildinfo` (generowane, nie do repo).
+
 ### Odłożone
+- `next lint` jest deprecated (zniknie w Next 16). Zostaje, bo CLAUDE.md definiuje `check` przez
+  `next lint`. Migracja do ESLint CLI (`next-lint-to-eslint-cli`) — do rozważenia po MVP.
+- `npm audit` zgłasza podatności w transitive deps — nie ruszam bez zapytania (zmiana zależności).
+- Pełne tokeny/motywy/fonty lokalne/komponenty/`/design` → krok 4.5. `zod`, `bcrypt`, `vitest`,
+  skrypt `seed` w `package.json` → odpowiednie kroki.
+
 ### Jak sprawdzić
 - `docker compose up` → strona startowa odpowiada, log pokazuje udane połączenie z bazą
 - `docker compose down && docker compose up` → dane Postgresa przetrwały
+
+**Zweryfikowane w tej sesji:**
+- `npm run check` przechodzi (tsc czysto, `next lint` bez błędów), `npm run build` — standalone,
+  `/health` jako `ƒ (Dynamic)`.
+- `docker compose up --build` → `db` healthy, `app` up; `curl /` → 200 `<h1>Release Hub</h1>`;
+  `curl /health` → 200, „Baza: OK".
+- `docker compose down && up` → log Postgresa „Skipping initialization" (volume `testhub_pgdata`
+  przetrwał), `/health` → 200.
 
 ---
 

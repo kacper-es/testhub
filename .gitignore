@@ -5,3 +5,7 @@ node_modules/
 *.log
 *.csv
 /data/
+
+# generated (Next / TS)
+next-env.d.ts
+*.tsbuildinfo
