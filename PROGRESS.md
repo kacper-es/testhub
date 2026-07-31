@@ -265,19 +265,51 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 5 — CRUD wersji `[ ]`
+## Krok 5 — CRUD wersji `[x]`
 
-- [ ] Tworzenie w jednej transakcji: `Version` + `VersionTask` (aktywne szablony) + `InstanceTestRun` (aktywne instancje)
-- [ ] Helper `resolveTask()`
-- [ ] Helper `logChange(tx, …)`
-- [ ] Zmiana statusu: zamrażanie snapshotów, `statusChanged*`, `cancelReason` przy `CANCELLED`
-- [ ] Ponowne otwarcie (tylko ADMIN) czyszczące snapshoty
+- [x] Tworzenie w jednej transakcji: `Version` + `VersionTask` (aktywne szablony) + `InstanceTestRun` (aktywne instancje)
+- [x] Helper `resolveTask()`
+- [x] Helper `logChange(tx, …)`
+- [x] Zmiana statusu: zamrażanie snapshotów, `statusChanged*`, `cancelReason` przy `CANCELLED`
+- [x] Ponowne otwarcie (tylko ADMIN) czyszczące snapshoty
 
 ### Decyzje
+- **Helpery:** `lib/versions/resolve-task.ts` (jedyne źródło efektywnych wartości zadania),
+  `lib/versions/log-change.ts` (zapis do `ChangeLog` w transakcji; pierwszy wywołujący w 6a),
+  `lib/versions/guard.ts` (`assertVersionEditable` / `VersionClosedError` — read-only na zamkniętej),
+  `lib/date.ts` (`todayInWarsaw` — „dzisiaj" po stronie serwera, Europe/Warsaw).
+- **Akcje** `app/actions/versions.ts`: `createVersion`, `releaseVersion`, `cancelVersion`,
+  `reopenVersion` — wszystkie przez `requireRole` (create/release/cancel: TESTER/ADMIN; **reopen: ADMIN**).
+  Unikat nazwy → przyjazny komunikat (catch P2002), nie surowy błąd Prismy. `releaseDate` date-only.
+  Zmiany statusu wersji **nie** idą do `ChangeLog` (reguła 30).
+- **UI interim:** `/versions/new` (formularz + ostrzeżenie o dacie w przeszłości bez blokady) i
+  `/versions` (lista + akcje statusu). Pełny widok wersji → krok 6, dashboard/archiwum → krok 7.
+  Ostrzeżenie o dacie porównuje **stringi** (`date < today`), `today` liczone server-side (bez `new Date()` w kliencie).
+- **`authz.test.ts` rozszerzony** o reprezentatywną akcję: PM (i niezalogowany) dostaje odmowę
+  z `createVersion` — dopięcie żywego dowodu odłożonego z 3b. Nadal 3 pliki testów; część
+  „mutacja na zamkniętej wersji" dojdzie w 6c.
+- `resolveTask`/snapshoty weryfikowane przez bazę (bez 4. pliku testów — prompt: „trzy pliki").
+
 ### Odłożone
+- Pełny widok `/versions/[id]` (checklista, instancje, komentarze) → kroki 6a–6c.
+- Właściwy dashboard (karty IN_PROGRESS) i `/archive` → krok 7. `/versions` to lista utylitarna.
+- Pierwszy realny wywołujący `logChange` → 6a (mutacje flag/statusów).
+
 ### Jak sprawdzić
 - Utwórz „9.9.9" → oczekuj 6 zadań i 5 runów
 - Ustaw `RELEASED` → zmień nazwę szablonu w bazie → archiwum pokazuje starą nazwę, otwarta wersja nową
+
+**Zweryfikowane w tej sesji (przeglądarka + baza):**
+- Utworzenie „9.9.9" → **6 `VersionTask` + 5 `InstanceTestRun`**.
+- `RELEASED` → status + `statusChangedById` + **6/6 snapshotów** zapisanych.
+- Zmiana nazwy szablonu w bazie → zamknięta wersja czyta **„Release notes dla klienta"** (snapshot),
+  szablon ma **„ZMIENIONA NAZWA"** (live) → zamrożenie działa (`resolveTask`). Nazwę przywrócono.
+- Reopen (ADMIN) → `IN_PROGRESS` + `statusChangedById` + **0 snapshotów** (wyczyszczone).
+- Duplikat „9.9.9" → **„Wersja 9.9.9 już istnieje"** (nie surowy błąd Prismy).
+- `npx vitest run` → 6/6 zielone (w tym PM→odmowa z `createVersion`); `npm run check`, `npm run build`,
+  `docker compose up --build` OK.
+- Uwaga narzędziowa: część klików pane'a chybiała przyciski (zła lokalizacja) — reopen/duplikat
+  wyzwolone przez `form.requestSubmit()`; efekty potwierdzone w bazie/DOM. Logika akcji poprawna.
 
 ---
 

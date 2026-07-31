@@ -27,11 +27,14 @@ export default async function HomePage() {
         <span className="font-mono">{user?.role}</span>).
       </p>
 
-      <p className="text-sm text-muted">
-        <Link className="underline" href="/design">
+      <nav className="flex gap-4 text-sm">
+        <Link className="underline" href="/versions">
+          Wersje →
+        </Link>
+        <Link className="text-muted underline" href="/design">
           Galeria komponentów →
         </Link>
-      </p>
+      </nav>
     </main>
   )
 }

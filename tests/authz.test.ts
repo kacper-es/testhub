@@ -1,6 +1,17 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Role, User } from '@prisma/client'
 import { assertRole, AuthorizationError } from '@/lib/auth/roles'
+
+// --- mocki dla testu reprezentatywnej server action (createVersion) ---
+vi.mock('@/lib/auth/session', () => ({ getSessionUser: vi.fn() }))
+vi.mock('@/lib/prisma', () => ({ prisma: {} }))
+vi.mock('next/navigation', () => ({ redirect: vi.fn() }))
+vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
+
+import { getSessionUser } from '@/lib/auth/session'
+import { createVersion } from '@/app/actions/versions'
+
+const mockedGetSessionUser = vi.mocked(getSessionUser)
 
 function user(role: Role, isActive = true): User {
   return {
@@ -36,6 +47,24 @@ describe('assertRole', () => {
 
   it('odrzuca nieaktywnego użytkownika mimo poprawnej roli', () => {
     expect(() => assertRole(user('ADMIN', false), ['ADMIN'])).toThrow(
+      AuthorizationError,
+    )
+  })
+})
+
+describe('createVersion (reprezentatywna server action)', () => {
+  beforeEach(() => mockedGetSessionUser.mockReset())
+
+  it('PM dostaje odmowę — mutacja nie wykonuje się', async () => {
+    mockedGetSessionUser.mockResolvedValue(user('PM'))
+    await expect(createVersion({}, new FormData())).rejects.toBeInstanceOf(
+      AuthorizationError,
+    )
+  })
+
+  it('niezalogowany dostaje odmowę', async () => {
+    mockedGetSessionUser.mockResolvedValue(null)
+    await expect(createVersion({}, new FormData())).rejects.toBeInstanceOf(
       AuthorizationError,
     )
   })
