@@ -538,15 +538,52 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 9 — Panel admina `[ ]`
+## Krok 9 — Panel admina `[x]`
 
-- [ ] `TaskTemplate`: dodawanie, edycja, dezaktywacja, `sortOrder`, blokada zmiany `taskType`
-- [ ] Konta: tworzenie z hasłem tymczasowym, reset, `isActive`, rola
-- [ ] `/admin/changelog` z filtrami i paginacją
+- [x] `TaskTemplate`: dodawanie, edycja, dezaktywacja, `sortOrder`, blokada zmiany `taskType`
+- [x] Konta: tworzenie z hasłem tymczasowym, reset, `isActive`, rola
+- [x] `/admin/changelog` z filtrami i paginacją
 
 ### Decyzje
+- **Trasy pod `/admin`** (wszystkie `requireRolePage(['ADMIN'])`): `/admin` (hub) →
+  `/admin/templates` (+`new`, `[id]/edit`), `/admin/users` (+`new`, `[id]`), `/admin/changelog`.
+  Spec wymienia tylko `/admin` i `/admin/changelog`; rozbicie na podtrasy dla czytelności, nie łamie zakresu.
+- **Szablony** (`app/actions/task-templates.ts`): create/update/`setActive`. **`taskType` niezmienny**
+  (reguła 7) — `updateTaskTemplate` w ogóle go nie czyta; `TemplateForm` przy edycji pokazuje typ
+  tylko do odczytu z podpowiedzią „dezaktywuj i utwórz nowy" (brak `<select>`). Pole
+  `daysBeforeRelease` widoczne tylko dla `DAYS_BEFORE_RELEASE` (stan kliencki); walidacja warunkowa
+  w akcji. Edycja działa na żywo w otwartych wersjach (reguła 4), dezaktywacja zostawia istniejące
+  `VersionTask` (reguła 8). Zero delete.
+- **Konta** (`app/actions/users.ts`): `createUser` (hasło tymczasowe → `mustChangePassword=true`,
+  P2002 → „Konto z tym adresem email już istnieje"), `resetUserPassword` (nowy hash +
+  `mustChangePassword=true` + **usunięcie wszystkich sesji** w transakcji — sekcja 6),
+  `setUserActive` (dezaktywacja usuwa sesje), `setUserRole`. **Blokada wykluczenia:** ADMIN nie może
+  dezaktywować własnego konta ani zmienić własnej roli — enforce w akcji (throw) + ukrycie kontrolek
+  dla własnego konta w UI (reset własnego hasła dozwolony).
+- **`/admin/changelog`:** filtry (wersja, użytkownik, typ encji, zakres dat) jako **natywny formularz
+  GET** (bez klienta), paginacja `PAGE_SIZE=50` linkami zachowującymi filtry. `ChangeLog.versionId`
+  to skalar (bez relacji) → mapowanie `id→nazwa` z osobnego `findMany`; użytkownik z relacji `user`.
+  Etykiety pól po polsku, wartości bool jako „tak/nie". Bez retencji (reguła 31).
+
 ### Odłożone
+- Dopracowanie (przejście po ekranach w obu motywach, mobile, focus, reduced-motion) → krok 10.
+
 ### Jak sprawdzić
+- `/admin` (ADMIN) → sekcje Szablony / Konta / Log zmian; nie-ADMIN → redirect `/`
+- Szablon: utwórz, edytuj (typ zablokowany), dezaktywuj; zmiana pól widoczna w otwartej wersji
+- Konto: utwórz (hasło tymczasowe), reset (wylogowuje ze wszystkich sesji), zmień rolę/aktywność
+- Changelog: filtruj po wersji/użytkowniku/encji/dacie, paginacja
+
+**Zweryfikowane w tej sesji (przeglądarka + baza):**
+- Szablon: utworzenie `TICKET_AGGREGATE` + `DAYS_BEFORE_RELEASE`=4 (warunkowe pole dni pojawia się
+  po wyborze terminu); edycja — **brak selecta `taskType`**, podpowiedź „niezmienny", pola prefilled.
+- Konto: utworzenie (`mustChangePassword=true`, hash bcrypt `$2b$12$`, rola TESTER); reset hasła →
+  **hash zmieniony, `mustChangePassword=true`, sesje usunięte (1→0)**; własne konto — ukryte
+  formularze roli/aktywności + notka „To Twoje konto".
+- Changelog: **35 wpisów**, etykiety pól PL, bool „tak/nie", nazwa wersji, czas Warsaw; filtr
+  `entityType=VersionTask` → **14 wpisów, same „Zadanie"**, select zachowuje wybór.
+- Dane testowe posprzątane (6 szablonów, 4 konta). `npm run check`, `npm run build`,
+  `docker compose up --build` OK; `npx vitest run` → 33/33.
 
 ---
 

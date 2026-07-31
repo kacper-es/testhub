@@ -55,6 +55,11 @@ export default async function DashboardPage() {
         <Link className="underline" href="/archive">
           Archiwum →
         </Link>
+        {user?.role === 'ADMIN' && (
+          <Link className="underline" href="/admin">
+            Panel administratora →
+          </Link>
+        )}
         <Link className="text-muted underline" href="/design">
           Galeria komponentów →
         </Link>
