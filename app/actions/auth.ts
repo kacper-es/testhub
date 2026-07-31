@@ -16,6 +16,7 @@ import {
   resetAttempts,
 } from '@/lib/auth/rate-limit'
 import { changePasswordSchema, loginSchema } from '@/lib/validation/auth'
+import { THEME_COOKIE } from '@/lib/theme'
 
 export type LoginState = { error?: string }
 export type ChangePasswordState = { error?: string }
@@ -56,6 +57,18 @@ export async function login(
 
   resetAttempts(email)
   await createSession(user.id)
+
+  // Mirror preferencji motywu (User.theme = źródło prawdy) do cookie czytanego
+  // w server layoucie — brak mrugnięcia po zalogowaniu.
+  const jar = await cookies()
+  jar.set(THEME_COOKIE, user.theme, {
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+  })
+
   redirect(user.mustChangePassword ? '/change-password' : '/')
 }
 

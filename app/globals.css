@@ -1,3 +1,98 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* Jasny motyw (domyślny) + scoped .light */
+  :root,
+  .light {
+    --bg: #fafaf7;
+    --surface: #ffffff;
+    --surface-raised: #f2f2ee;
+    --border: #dfdfd8;
+    --text: #1a1d24;
+    --text-muted: #5c6370;
+    --focus: #1f5fbf;
+
+    --status-pass: #2fa36b;
+    --status-warn: #d9a404;
+    --status-fail: #d9483d;
+
+    --text-pass: #1e7a4c;
+    --text-warn: #8a6300;
+    --text-fail: #b03227;
+
+    color-scheme: light;
+  }
+
+  /* Ciemny motyw — jawny wybór (klasa .dark na dowolnym elemencie) */
+  .dark {
+    --bg: #12151c;
+    --surface: #171b24;
+    --surface-raised: #1e2430;
+    --border: #2a3140;
+    --text: #e6e9ef;
+    --text-muted: #98a1b0;
+    --focus: #7fb2ff;
+
+    --status-pass: #2fa36b;
+    --status-warn: #d9a404;
+    --status-fail: #d9483d;
+
+    --text-pass: #2fa36b;
+    --text-warn: #d9a404;
+    --text-fail: #e8695e;
+
+    color-scheme: dark;
+  }
+
+  /* SYSTEM: gdy brak jawnej klasy, idź za preferencją OS */
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark) {
+      --bg: #12151c;
+      --surface: #171b24;
+      --surface-raised: #1e2430;
+      --border: #2a3140;
+      --text: #e6e9ef;
+      --text-muted: #98a1b0;
+      --focus: #7fb2ff;
+
+      --status-pass: #2fa36b;
+      --status-warn: #d9a404;
+      --status-fail: #d9483d;
+
+      --text-pass: #2fa36b;
+      --text-warn: #d9a404;
+      --text-fail: #e8695e;
+
+      color-scheme: dark;
+    }
+  }
+
+  html {
+    font-family: var(--font-sans), system-ui, sans-serif;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+  }
+
+  /* Widoczny focus ring na każdym elemencie interaktywnym (sekcja 9.4) */
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* Animacje wyłączone (nie skrócone) przy prefers-reduced-motion (sekcja 9.4) */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}

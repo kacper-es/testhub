@@ -217,20 +217,51 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 4,5 — Fundament wizualny `[ ]`
+## Krok 4,5 — Fundament wizualny `[x]`
 
-- [ ] Tokeny CSS variables, oba motywy, warianty tekstowe kolorów statusów
-- [ ] `tailwind.config` mapujący tokeny
-- [ ] Przełącznik motywu: `User.theme` + cookie czytane w server layoucie (bez FOUC)
-- [ ] Komponenty: `Button`, `Card`, `StatusBadge`, `Checkbox`, `StepDots`, `DataTable`
-- [ ] Fonty lokalne (`next/font/local`), pliki `.woff2` w repo
-- [ ] Strona `/design` z galerią
+- [x] Tokeny CSS variables, oba motywy, warianty tekstowe kolorów statusów
+- [x] `tailwind.config` mapujący tokeny
+- [x] Przełącznik motywu: `User.theme` + cookie czytane w server layoucie (bez FOUC)
+- [x] Komponenty: `Button`, `Card`, `StatusBadge`, `Checkbox`, `StepDots`, `DataTable`
+- [x] Fonty lokalne (`next/font/local`), pliki `.woff2` w repo
+- [x] Strona `/design` z galerią
 
 ### Decyzje
+- **Tokeny w `app/globals.css`:** jasny w `:root, .light`; ciemny w `.dark`; `SYSTEM` przez
+  `@media (prefers-color-scheme: dark)` na `:root:not(.light):not(.dark)`. Selektory klasowe
+  (nie tylko `:root`) → można scope'ować motyw na wycinku (panele „oba motywy" na `/design`).
+- **Nazwy tokenów w Tailwindzie płaskie** (`fg`, `muted`, `pass/warn/fail` = wypełnienia,
+  `pass-strong/warn-strong/fail-strong` = dostępne warianty tekstowe). Paleta **zawężona do tokenów**
+  (bez domyślnych `gray-*/green-*/red-*`) — twarde egzekwowanie niezmiennika.
+- **Kontrast:** zweryfikowany skryptem WCAG w obu motywach. Wszystkie pary tekstu ≥ 4,5:1, UI ≥ 3:1.
+  Jedyny wyjątek — warn (#D9A404) jako samo wypełnienie na jasnym tle (2,27) — mitygowany
+  **obramowaniem elementów statusowych** (StepDots/StatusBadge) w wariancie `*-strong` (≥ 4,5:1),
+  bez zmiany sygnaturowych kolorów wypełnień z sekcji 9.1.
+- **Fonty:** zvendorowane `.woff2` w `public/fonts` (IBM Plex Sans 400/600, JetBrains Mono 400/700,
+  subset latin), pozyskane przez `@fontsource` (dev, potem odinstalowane), `next/font/local`.
+- **Motyw:** `User.theme` źródłem prawdy, mirror w cookie `theme` czytanym w server root-layoucie
+  (klasa na `<html>`, bez FOUC). Akcja `setTheme` (`requireUser`), klient przełącza optymistycznie
+  klasę i `router.refresh()`. Cookie ustawiane też przy logowaniu (z `User.theme`).
+- Strona główna `/` odświeżona na tokeny/komponenty; `/design` pod auth (grupa `(app)`).
+- **Przycisk primary neutralny** (odwrócenie `fg`/`bg`), nie zielony — żeby nie mylić z semantyką
+  statusu pass i nie łamać kontrastu (biały na zieleni < 4,5:1).
+
 ### Odłożone
+- `DataTable` to prosty, generyczny komponent bazowy — bogatsze warianty (sortowanie, sticky header)
+  dojdą, jeśli będą potrzebne w krokach 6b/7.
+- Realne dane w komponentach (wersje/instancje) → kroki 5–7; tu tylko galeria z próbkami.
+
 ### Jak sprawdzić
 - `/design` w obu motywach, przełączenie bez mrugnięcia, po odświeżeniu motyw zachowany
 - Kontrasty sprawdzone narzędziem, wszystkie ≥ 4,5:1 dla tekstu
+
+**Zweryfikowane w tej sesji:**
+- `npm run check` i `npm run build` przechodzą (trasa `/design` obecna, fonty `next/font/local` OK).
+- `docker compose up --build` startuje; `/design` chronione (307 → `/login` bez cookie), po
+  zalogowaniu adminem renderuje pełną galerię w obu panelach (jasny/ciemny), z przełącznikiem motywu.
+- Skrypt kontrastu: wszystkie pary tekstu ≥ 4,5:1 i UI ≥ 3:1 (poza mitygowanym warn-fill na jasnym).
+- **Podgląd wizualny** opublikowany jako Artifact (oba motywy, zaszyte fonty) — patrz link w sesji.
+  (Pane przeglądarki nie kompozytuje klatek → weryfikacja renderu przez odczyt DOM + Artifact.)
 
 ---
 
