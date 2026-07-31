@@ -313,47 +313,139 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 6a — Checklista `[ ]`
+## Krok 6a — Checklista `[x]`
 
-- [ ] Trzy typy zadań z właściwą logiką statusu
-- [ ] `INSTANCE_AGGREGATE` nieklikalny, wyliczany
-- [ ] `TICKET_AGGREGATE`: walidacja, `total = 0` → `—`
-- [ ] Deadline'y i progi pilności, `FLEXIBLE` → „elastyczny"
-- [ ] `completedBy` / `completedAt`, czyszczone przy odznaczeniu
-- [ ] `deadline.test.ts`, `aggregates.test.ts`
+- [x] Trzy typy zadań z właściwą logiką statusu
+- [x] `INSTANCE_AGGREGATE` nieklikalny, wyliczany
+- [x] `TICKET_AGGREGATE`: walidacja, `total = 0` → `—`
+- [x] Deadline'y i progi pilności, `FLEXIBLE` → „elastyczny"
+- [x] `completedBy` / `completedAt`, czyszczone przy odznaczeniu
+- [x] `deadline.test.ts`, `aggregates.test.ts`
 
 ### Decyzje
+- **Helpery czyste (testowalne bez mocków):** `lib/versions/deadline.ts`
+  (`taskDeadline`, `daysRemaining`, `urgency`, `resolveDeadline` z gałęzią `FLEXIBLE`) i
+  `lib/versions/aggregates.ts` (`ticketAggregateStatus`, `instanceAggregateStatus`).
+  Arytmetyka dat na UTC-północy ze stringów `YYYY-MM-DD` — wolna od strefy (reguła 22).
+  Deadline i „ile dni" liczone po stronie serwera, `resolveDeadline` jest jedynym źródłem
+  dla widoku (bez `new Date()` w kliencie — reguła 25).
+- **Akcje** `app/actions/tasks.ts`: `setCheckboxTaskStatus` (CHECKBOX, log `status`),
+  `setTicketCounters` (TICKET, walidacja `0 ≤ current ≤ total`, log `manualCounter*`, status
+  **wyliczany** przez `ticketAggregateStatus`). Obie: `requireRole(['TESTER','ADMIN'])` +
+  `assertVersionEditable` + `logChange` w tej samej transakcji (pierwszy realny wywołujący helpera).
+- **`completedBy/At` jednolicie wg reguły 17** także dla TICKET (wejście/zejście z DONE) —
+  wybrana opcja rekomendowana. `INSTANCE_AGGREGATE`: status nigdy nie zapisywany, `completedBy`
+  nieaplikowalny — status wyliczany przy renderze z flag `InstanceTestRun` (reguła 16).
+- **Kontrolki klienckie:** `CheckboxTaskControl` (cykl NOT_STARTED→IN_PROGRESS→DONE→…,
+  `useOptimistic`, animacja „wskoczenia" na DONE z remountem przez `key`), `TicketCounterControl`
+  (dwa pola + zapis, `—` przy `total=0`, walidacja kliencka + serwerowa). INSTANCE_AGGREGATE:
+  `StepDots` + badge, nieklikalny (`cursor-default`).
+- **Status w bazie dla TICKET zapisywany** (spójność + hak `completedBy`), ale czytany zawsze
+  przez `ticketAggregateStatus` — pole `status` nie jest źródłem prawdy dla agregatów.
+
 ### Odłożone
+- „Dodaj zadanie z szablonu" (furtka reguła 6) — mutacja spoza logiki 3 typów; do rozważenia
+  przy panelu admina/szablonach (krok 9) lub osobno.
+- Widok wersji rozwijany w 6b (instancje) i 6c (komentarze) — ten sam plik `/versions/[id]`.
+
 ### Jak sprawdzić
+- Otwórz `/versions/[id]`: 3 typy zadań, deadline w kolorze progu, `FLEXIBLE` → „elastyczny"
+- CHECKBOX: cykl statusu z audytem `completedBy` na DONE; TICKET: `—` przy `0/0`, walidacja `current≤total`
+- `npx vitest run` → `deadline.test.ts` + `aggregates.test.ts` zielone
+
+**Zweryfikowane w tej sesji (przeglądarka + baza, fixture „9.9.9"):**
+- Strona renderuje się w całości (RSC + wszystkie kontrolki), guard `/versions/[id]` bez cookie → 307.
+- CHECKBOX „Release notes": NOT_STARTED→IN_PROGRESS→**DONE** + `completedById=Admin` + `completedAt`;
+  `ChangeLog`: 2 wpisy `status`.
+- TICKET „Weryfikacja zgłoszeń": **3/5 → IN_PROGRESS** (wyliczony); `ChangeLog`:
+  `manualCounterCurrent 0→3`, `manualCounterTotal 0→5`.
+- INSTANCE_AGGREGATE „Gotowość środowisk": po ustawieniu 1 flagi przeliczony na **W trakcie 0/5**.
+- `npx vitest run` → 33/33; `npm run check`, `npm run build` OK.
 
 ---
 
-## Krok 6b — Tabela instancji `[ ]`
+## Krok 6b — Tabela instancji `[x]`
 
-- [ ] 4 checkboxy, każdy osobna akcja na jedno pole
-- [ ] `notes` z debounce 800 ms i ochroną focus/dirty
-- [ ] Polling 5 s (`useLivePolling`), pauza przy `document.hidden`
-- [ ] Pod/odpinanie instancji przez `excludedAt`
-- [ ] Tooltipy z `ChangeLog`, jedno zapytanie `DISTINCT ON`
+- [x] 4 checkboxy, każdy osobna akcja na jedno pole
+- [x] `notes` z debounce 800 ms i ochroną focus/dirty
+- [x] Polling 5 s (`useLivePolling`), pauza przy `document.hidden`
+- [x] Pod/odpinanie instancji przez `excludedAt`
+- [x] Tooltipy z `ChangeLog`, jedno zapytanie `DISTINCT ON`
 
 ### Decyzje
+- **`app/actions/test-runs.ts`:** 4 nazwane akcje flag (`setEnvironmentRestored`,
+  `setDbScriptsInstalled`, `setBackendUpdated`, `setTestsCompleted`) delegujące do wspólnego
+  `setFlag` — każda aktualizuje **jedną kolumnę** (reguła 21, brak wzajemnego nadpisywania).
+  `setNotes` (walidacja + log), `unpinInstanceRun` (`excludedAt=now`), `attachInstance`
+  (przywraca odpięty run `excludedAt=null` lub tworzy nowy — reguła 20). Wszystkie: `requireRole` +
+  `assertVersionEditable` + `logChange` w transakcji; `updatedById` aktualizowane.
+- **`excludedAt` NIE idzie do `ChangeLog`** (reguła 27 obejmuje tylko 4 flagi, `notes`, pola VersionTask).
+- **Polling:** `lib/hooks/use-live-polling.ts` (jeden hook, `router.refresh()` co 5 s, pauza na
+  `document.hidden`, natychmiastowy refresh na powrót do widoczności) montowany komponentem
+  `LivePolling` tylko na wersji `IN_PROGRESS`. Reszta zostaje Server Components (reguła 7).
+- **`NotesField`:** komponent kliencki z debounce 800 ms i wskaźnikiem „zapisywanie…/zapisano".
+  Dopóki pole ma focus **albo** jest dirty — dane z serwera (polling) są ignorowane; po udanym
+  zapisie znów przyjmuje serwer (reguła 7, ochrona przed zerowaniem `notes`).
+- **`FlagCheckbox`:** `useOptimistic`, akcja przekazywana propem; reużyty `Checkbox` z nowymi
+  `hideLabel`/`title` (tooltip). Tabela: desktop `<table>`, mobile karty (`md:hidden`) — bez
+  poziomego scrolla (sekcja 9.4).
+- **Tooltipy z `ChangeLog`:** jedno zapytanie `$queryRaw` `DISTINCT ON (entityId, field)` na całą
+  stronę (reguła 4, bez N+1), mapowane kluczem `${runId}:${field}`, format „pole: user, dzień godz.".
+- **Tabela pokazuje tylko aktywne runy** (`excludedAt=null`); odpięte wracają przez „Podepnij
+  instancję" z adnotacją „(były dane)".
+
 ### Odłożone
+- Bogatszy `DataTable` (sort/sticky) — niepotrzebny; własna responsywna tabela w komponencie.
+- Dashboard skrótowy „3/5 instancji gotowych" → krok 7.
+
 ### Jak sprawdzić
 - Dwie przeglądarki obok siebie: zmiana widoczna u drugiej w ≤ 5 s
 - Pisz w `notes` przez 15 s — tekst nie znika przy odświeżeniach
 - Odepnij instancję z danymi, podepnij ponownie → notatki i flagi wróciły
 
+**Zweryfikowane w tej sesji (przeglądarka + baza):**
+- Flaga `environmentRestored` Klienta A → `true`, `updatedById=Admin`; `ChangeLog`
+  `environmentRestored false→true`. Agregat instancji przeliczony na „W trakcie".
+- Tooltip flagi z `DISTINCT ON`: „środowisko odtworzone: Admin, pt., 10:21".
+- **Odpięcie/podpięcie (reguła 18):** `unpinInstanceRun` → `excludedAt` ustawione, flaga
+  zachowana; opcja „(były dane)" w selekcie; `attachInstance` → `excludedAt=null`, flaga wróciła,
+  **liczba runów wciąż 5** (bez duplikatu). `npm run check`, `npm run build`, `docker compose up` OK.
+
 ---
 
-## Krok 6c — Komentarze `[ ]`
+## Krok 6c — Komentarze `[x]`
 
-- [ ] Sekcja komentarzy (TESTER/ADMIN)
-- [ ] Wymuszenie read-only na wersji zamkniętej we wszystkich akcjach
-- [ ] `authz.test.ts`
+- [x] Sekcja komentarzy (TESTER/ADMIN)
+- [x] Wymuszenie read-only na wersji zamkniętej we wszystkich akcjach
+- [x] `authz.test.ts`
 
 ### Decyzje
+- **`app/actions/comments.ts`:** `addComment(versionId, content)` — `requireRole(['TESTER','ADMIN'])`
+  (PM to pełny read-only, nie dodaje nawet komentarzy — sekcja 5), walidacja `zod`,
+  `assertVersionEditable`, create. Komentarze **nie** idą do `ChangeLog` (reguła 27).
+  `CommentForm` kliencki (kontrolowana treść, czyszczenie po sukcesie, błąd inline); lista malejąco
+  po `createdAt` (autor + czas w strefie Warsaw + treść `whitespace-pre-wrap`).
+- **Read-only wymuszone we WSZYSTKICH akcjach mutujących** wersję (reguła 12): `assertVersionEditable`
+  jest już w `tasks.ts` (6a), `test-runs.ts` (6b) i `comments.ts` (6c) — zamknięta wersja odrzuca
+  każdą mutację po stronie serwera. Baner „Wersja zamknięta — tylko do odczytu" + wyłączone
+  kontrolki (`disabled`) to warstwa kosmetyczna nad wymuszeniem.
+- **`authz.test.ts` domknięty** o drugą część z sekcji 12: `addComment` na wersji `RELEASED`/`CANCELLED`
+  rzuca `VersionClosedError` (mock `prisma.version.findUnique` zwraca zamknięty status).
+
 ### Odłożone
+- Widok wersji jest kompletny (checklista + instancje + komentarze). Dalej: dashboard/archiwum (7).
+
 ### Jak sprawdzić
+- Jako TESTER/ADMIN dodaj komentarz na otwartej wersji → pojawia się na liście
+- Jako PM: brak formularza; próba `addComment` z DevToolsów → odmowa (rola)
+- Na wersji zamkniętej: baner read-only, brak kontrolek; `addComment`/flagi/liczniki odrzucone serwerowo
+
+**Zweryfikowane w tej sesji (przeglądarka + baza):**
+- Komentarz dodany przez Admina, widoczny na liście.
+- `npx vitest run` → **33/33** (w tym `authz.test.ts`: PM/niezalogowany odrzuceni z `createVersion`,
+  `addComment` na RELEASED/CANCELLED → `VersionClosedError`).
+- `npm run check`, `npm run build`, `docker compose up --build` — OK (entrypoint „No pending
+  migrations", Ready; `/versions/[id]` bez cookie → 307).
 
 ---
 

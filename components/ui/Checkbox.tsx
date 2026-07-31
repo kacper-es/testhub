@@ -7,14 +7,19 @@ export function Checkbox({
   onCheckedChange,
   label,
   disabled,
+  hideLabel,
+  title,
 }: {
   checked: boolean
   onCheckedChange?: (value: boolean) => void
   label: string
   disabled?: boolean
+  hideLabel?: boolean
+  title?: string
 }) {
   return (
     <label
+      title={title}
       className={cn(
         'inline-flex select-none items-center gap-2',
         disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
@@ -54,7 +59,9 @@ export function Checkbox({
           )}
         </span>
       </span>
-      <span className="text-sm text-fg">{label}</span>
+      <span className={cn('text-sm text-fg', hideLabel && 'sr-only')}>
+        {label}
+      </span>
     </label>
   )
 }

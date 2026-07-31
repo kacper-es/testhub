@@ -59,7 +59,12 @@ export default async function VersionsPage() {
               <Card key={v.id} className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-lg">{v.name}</span>
+                    <Link
+                      href={`/versions/${v.id}`}
+                      className="font-mono text-lg underline"
+                    >
+                      {v.name}
+                    </Link>
                     <StatusBadge status={s.badge}>{s.label}</StatusBadge>
                   </div>
                   <span className="font-mono text-sm text-muted">
