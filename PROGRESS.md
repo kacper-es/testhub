@@ -587,19 +587,51 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 10 — Dopracowanie `[ ]`
+## Krok 10 — Dopracowanie `[x]`
 
-- [ ] Przejście po wszystkich ekranach w obu motywach
-- [ ] Mobile: tabela instancji → karty
-- [ ] Focus ring, nawigacja klawiaturą
-- [ ] `prefers-reduced-motion`
-- [ ] Wszystkie puste stany i przypadki brzegowe
+- [x] Przejście po wszystkich ekranach w obu motywach
+- [x] Mobile: tabela instancji → karty
+- [x] Focus ring, nawigacja klawiaturą
+- [x] `prefers-reduced-motion`
+- [x] Wszystkie puste stany i przypadki brzegowe
 
 ### Decyzje
+- **Audyt zamiast przebudowy** — aplikacja była budowana na tokenach od kroku 4.5, więc krok 10
+  to audyt + punktowe poprawki, nie przeprojektowanie.
+- **Poprawka a11y:** `CheckboxTaskControl` tłumił focus ring (`focus-visible:outline-none`) —
+  zamienione na widoczny ring (`focus-visible:outline-2 outline-focus`). Reszta kontrolek to
+  natywne elementy z globalnym `:focus-visible` z `globals.css`.
+- **Motywy z konstrukcji:** grep potwierdził **zero surowych klas kolorów** Tailwinda
+  (`gray/green/red/...-NNN`) — wszystko przez tokeny CSS variables; oba motywy zdefiniowane w
+  `globals.css`. Zmiana motywu zapisywana w `User.theme` + cookie czytane w server-layoucie (bez FOUC).
+- **`prefers-reduced-motion`** obsłużone globalnie w `globals.css` (animacje wyłączone, nie skrócone).
+
 ### Odłożone
+- Krok 11 (SSE + LISTEN/NOTIFY) — opcjonalny, po MVP. Polling 5 s zostaje.
+- Per-stronowe `<title>` (metadata) — pominięte; wewnętrzna aplikacja, tytuł „Release Hub" wystarcza.
+
 ### Jak sprawdzić
+- Przełącz motyw (Jasny/Ciemny/Systemowy) — zachowany po odświeżeniu, bez mrugnięcia
+- Zwęź okno do ~375 px — tabela instancji → karty, changelog przewija się w swoim kontenerze
+- Tab po kontrolkach — widoczny focus ring; checkboxy działają Space/Enter
+
+**Zweryfikowane w tej sesji (przeglądarka + baza):**
+- **Motyw ciemny:** `<html>.dark`, `body` tło `#12151C` / tekst `#E6E9EF` (tokeny ciemne),
+  `User.theme=DARK` zapisany server-side. Zero surowych kolorów w kodzie (grep).
+- **Mobile (375 px):** widok wersji — tabela ukryta, **5 kart instancji** z edytowalnymi
+  polami/notatkami, **brak poziomego scrolla body**; changelog — szeroka tabela przewija się we
+  własnym `overflow-x-auto`, body bez scrolla.
+- **Focus/klawiatura:** przycisk statusu focusowalny, ring przywrócony (`outline-none` usunięty).
+- **Puste stany:** dashboard bez wersji IN_PROGRESS → „Brak wersji w przygotowaniu — dodaj pierwszą";
+  (pozostałe puste stany obsłużone w kodzie — changelog/archiwum/instancje/wersja bez zadań/instancji).
+- Fixture przywrócony do `IN_PROGRESS` (reopen wyczyścił snapshoty), motyw Admina wrócił do SYSTEM.
+  `npm run check`, `npm run build`, `docker compose up --build` OK; `npx vitest run` → 33/33.
 
 ---
+
+## MVP kompletne (kroki 1–10) `[x]`
+
+Wszystkie kroki MVP z sekcji 12 zrobione i zweryfikowane. Pozostaje opcjonalny krok 11 (SSE) po MVP.
 
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 

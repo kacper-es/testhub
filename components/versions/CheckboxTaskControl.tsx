@@ -50,7 +50,7 @@ export function CheckboxTaskControl({
         type="button"
         onClick={cycle}
         aria-label={`Status zadania: ${meta.label}. Kliknij, aby zmienić.`}
-        className="rounded-full focus-visible:outline-none"
+        className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
       >
         {/* key wymusza remount → animacja „wskoczenia" na DONE (sekcja 9.4) */}
         <span
