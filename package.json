@@ -10,6 +10,7 @@
     "check": "tsc --noEmit && next lint",
     "test": "vitest run",
     "seed": "node --env-file=.env --import tsx prisma/seed.ts",
+    "import:instances": "node --env-file=.env --import tsx scripts/import-instances.ts",
     "postinstall": "prisma generate"
   },
   "dependencies": {

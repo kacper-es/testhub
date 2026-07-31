@@ -49,6 +49,9 @@ export default async function DashboardPage() {
         <Link className="underline" href="/versions">
           Zarządzanie wersjami →
         </Link>
+        <Link className="underline" href="/instances">
+          Katalog instancji →
+        </Link>
         <Link className="underline" href="/archive">
           Archiwum →
         </Link>

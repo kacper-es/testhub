@@ -496,14 +496,45 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 8 — Katalog instancji `[ ]`
+## Krok 8 — Katalog instancji `[x]`
 
-- [ ] CRUD `Instance` bez delete (`isActive`)
-- [ ] `scripts/import-instances.ts` z CSV + podsumowanie
+- [x] CRUD `Instance` bez delete (`isActive`)
+- [x] `scripts/import-instances.ts` z CSV + podsumowanie
 
 ### Decyzje
+- **`/instances`** (lista) — `requireUser` (podgląd dla wszystkich, w tym PM — „Przeglądanie
+  wszystkiego"); kontrolki Edytuj/Dezaktywuj tylko dla TESTER/ADMIN (`canEdit`). `/instances/new`
+  i `/instances/[id]/edit` — `requireRolePage(['TESTER','ADMIN'])`.
+- **Akcje** `app/actions/instances.ts`: `createInstance`, `updateInstance` (`useActionState`,
+  wspólny `InstanceForm`), `setInstanceActive` (toggle). Wszystkie `requireRole(['TESTER','ADMIN'])`,
+  walidacja `zod` (`clientName` opcjonalny → null). **Zero delete** — dezaktywacja przez `isActive`
+  (reguła integralności). Nowa/edytowana instancja nie dopina się sama do trwających wersji.
+- **Import CSV** `scripts/import-instances.ts` (`npm run import:instances -- <plik.csv>`):
+  nagłówki `name,clientName,keyFunctionalities`, własny parser CSV (cudzysłowy, przecinki i
+  nowe linie w polach, `""`, BOM), podsumowanie „dodano/zaktualizowano/pominięto" z powodami.
+  Bez UI importu (sekcja 11).
+- **Upsert po `name` bez zmiany schematu:** `Instance.name` nie ma `@unique` (świadomie odłożone
+  w kroku 4), a inwariant zabrania zmiany `schema.prisma` bez pokazania diffa — więc ręczny upsert
+  (`findFirst` po name → update/create), nie `prisma.upsert`. Cel z sekcji 11 osiągnięty bez migracji.
+
 ### Odłożone
+- `@unique` na `Instance.name` — niepotrzebne przy ręcznym upsercie; gdyby pojawił się wymóg
+  twardej unikalności, to osobna migracja z pokazaniem diffa.
+- Panel admina (`TaskTemplate`, konta, changelog) → krok 9.
+
 ### Jak sprawdzić
+- `/instances`: lista aktywnych i nieaktywnych; „Nowa instancja", „Edytuj", „Dezaktywuj/Aktywuj"
+- `npm run import:instances -- plik.csv` → podsumowanie; ponowny import tego samego → „zaktualizowano"
+- PM: widzi listę, brak kontrolek edycji; akcje odrzucane serwerowo (rola)
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + CLI):**
+- Import CSV: przebieg 1 → **dodano 2, pominięto 1** („wiersz 4: brak nazwy"); przebieg 2 →
+  **zaktualizowano 2** (upsert po name). Pole z przecinkiem w cudzysłowie zachowane, puste
+  `clientName` → `null`.
+- UI: utworzenie instancji z formularza (zapisane), dezaktywacja (`isActive=false`, bez delete),
+  strona edycji prefilluje wszystkie pola + ukryte `id`. Lista pokazuje licznik „N przypisań".
+- Dane testowe posprzątane (zostało 5 seedowych instancji). `npm run check`, `npm run build`,
+  `docker compose up --build` OK; `npx vitest run` → 33/33.
 
 ---
 
