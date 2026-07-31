@@ -449,16 +449,50 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ---
 
-## Krok 7 — Dashboard i archiwum `[ ]`
+## Krok 7 — Dashboard i archiwum `[x]`
 
-- [ ] Karty wersji `IN_PROGRESS`, sortowane po `releaseDate`
-- [ ] `StepDots`, progi kolorów, licznik instancji (bez odpiętych)
-- [ ] Archiwum: `RELEASED` + `CANCELLED` z filtrem, `cancelReason`
-- [ ] Puste stany
+- [x] Karty wersji `IN_PROGRESS`, sortowane po `releaseDate`
+- [x] `StepDots`, progi kolorów, licznik instancji (bez odpiętych)
+- [x] Archiwum: `RELEASED` + `CANCELLED` z filtrem, `cancelReason`
+- [x] Puste stany
 
 ### Decyzje
+- **`/` = dashboard** (przebudowa `app/(app)/page.tsx`): wersje `IN_PROGRESS`, `orderBy releaseDate asc`.
+  `LivePolling` (reguła 7). Nagłówek: `ThemeToggle` + „Wyloguj" + nawigacja do
+  `/versions` (zarządzanie), `/archive`, `/design`.
+- **`VersionCard`** (`components/versions/VersionCard.tsx`), klikalna do `/versions/[id]`:
+  - odliczanie na poziomie wersji „za N dni" w kolorze wg progów reguły 26
+    (`urgency(daysRemaining(releaseDate, today))`, „po terminie" przy ujemnym) — serwerowo;
+  - `StepDots` (sygnaturowy): zadania `DONE`/wszystkie, gdzie status każdego liczony jak w 6a
+    (CHECKBOX = `status`, TICKET/INSTANCE = z agregatów — **agregaty nieklikalne liczą się do postępu**);
+  - skrócona checklista: kropka statusu + nazwa + deadline zadania (`resolveDeadline`, „elastyczny");
+  - „X/Y instancji gotowych" z `instanceAggregateStatus` (bez odpiętych — reguła 19).
+- **`/archive`** (`app/(app)/archive/page.tsx`): `RELEASED`+`CANCELLED`, filtr przez `searchParams`
+  (`?status=released|cancelled`, domyślnie wszystkie) jako linki-chipy — bez klienta.
+  `orderBy statusChangedAt desc`, „Zamknięto: <kto>, <kiedy>" (`statusChangedBy`, strefa Warsaw),
+  `cancelReason` przy `CANCELLED`. Klikalne do `/versions/[id]` (read-only z 6c).
+- **Puste stany** (sekcja 9.5): brak wersji `IN_PROGRESS` → „Brak wersji w przygotowaniu — dodaj
+  pierwszą"; wersja bez zadań / bez instancji → krótkie komunikaty; pusty filtr archiwum →
+  „Brak wersji w tym filtrze".
+- Bez nowej logiki domenowej (progi/agregaty już pokryte testami), bez zmian `schema.prisma`,
+  bez nowych zależności.
+
 ### Odłożone
+- Katalog instancji `/instances` → krok 8; panel admina `/admin` i `/admin/changelog` → krok 9.
+
 ### Jak sprawdzić
+- `/` pokazuje karty wersji `IN_PROGRESS` z `StepDots`, kolorem odliczania i „X/Y instancji gotowych"
+- Po `RELEASED`/`CANCELLED` wersja znika z dashboardu i pojawia w `/archive`
+- `/archive` filtruje po statusie; przy anulowanej widać powód i kto zamknął
+
+**Zweryfikowane w tej sesji (przeglądarka + baza):**
+- Dashboard: karta „9.9.9" — `StepDots` **6/6** (2 CHECKBOX + 2 TICKET + 2 INSTANCE_AGGREGATE
+  policzone z flag), odliczanie **„za 32 dni"** (zielone), deadline'y per zadanie (dni / „elastyczny"),
+  **„5/5 instancji gotowych"**.
+- Archiwum (na 2 wstrzykniętych i potem usuniętych wersjach): lista sortowana malejąco po zamknięciu,
+  badge statusu, „Zamknięto: Admin, <data Warsaw>", powód przy anulowanej; filtry
+  Wszystkie/Wydane/Anulowane zawężają poprawnie.
+- `npm run check`, `npm run build` OK; `docker compose up --build` startuje (Ready). `npx vitest run` → 33/33.
 
 ---
 
