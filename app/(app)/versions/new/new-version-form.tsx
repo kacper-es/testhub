@@ -3,11 +3,19 @@
 import { useActionState, useState } from 'react'
 import { createVersion, type CreateVersionState } from '@/app/actions/versions'
 import { Button } from '@/components/ui/Button'
-import { Field, Input } from '@/components/ui/Input'
+import { Field, Input, Select } from '@/components/ui/Input'
 
 const initial: CreateVersionState = {}
 
-export function NewVersionForm({ today }: { today: string }) {
+export type AppOption = { id: string; name: string }
+
+export function NewVersionForm({
+  today,
+  apps,
+}: {
+  today: string
+  apps: AppOption[]
+}) {
   const [state, action, pending] = useActionState(createVersion, initial)
   const [date, setDate] = useState('')
 
@@ -31,6 +39,19 @@ export function NewVersionForm({ today }: { today: string }) {
           onChange={(e) => setDate(e.target.value)}
         />
       </Field>
+
+      {apps.length > 0 && (
+        <Field label="Aplikacja" optional>
+          <Select name="applicationId" defaultValue="">
+            <option value="">— brak —</option>
+            {apps.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
 
       {isPast && (
         <p role="status" className="text-sm text-warn-strong">

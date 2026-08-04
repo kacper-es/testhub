@@ -648,6 +648,12 @@ brak motywów, brak komponentów. Reszta aplikacji zbudowana poprawnie na tokena
   `TemplateForm`, `CreateUserForm`, `ResetPasswordForm`, `CommentForm`
 - [x] Usunięta galeria komponentów: link z dashboardu + trasa `/design` +
   `components/design/Showcase.tsx` (dev-tool, niepotrzebny na produkcji)
+- [x] `app/favicon.ico` — wielorozmiarowy (16–256) kafelek „RH" w kolorach tokenów
+  (`#1a1d24` tło / `#fafaf7` litery); podpięty automatycznie przez konwencję App Routera
+- [x] `app/icon.svg` — adaptacyjny favicon (`prefers-color-scheme`): ciemny kafelek na
+  jasnym chrome, jasny na ciemnym; SVG ma pierwszeństwo, `.ico` to fallback. Dodano
+  `icon.svg` do wykluczeń matchera middleware (jak `favicon.ico`) — inaczej brama auth
+  blokowała asset na stronie logowania (wylogowany user)
 
 ### Decyzje
 - **Zero nowej palety/fontów.** Baza design (ui-ux-pro-max) sugerowała niebiesko-zielony
@@ -675,6 +681,67 @@ brak motywów, brak komponentów. Reszta aplikacji zbudowana poprawnie na tokena
 **Zweryfikowane w tej sesji:**
 - `npm run check` przechodzi (tsc czysto, `next lint` bez błędów).
 - Podgląd wizualny (oba motywy, dokładne wartości tokenów + fonty) pokazany jako widget.
+
+---
+
+## Krok App-1 — Aplikacje i ikony wersji `[x]`
+
+Feature poza zakresem MVP (na życzenie): najprostszy podział wersji na aplikacje
+przez małą ikonę przy nazwie + panel admina do zarządzania aplikacjami i wgrywania ikon.
+
+- [x] Model `Application` (`name @unique`, `iconData`/`iconType`/`iconUpdatedAt`, `isActive`, `sortOrder`) + opcjonalna relacja `Version.applicationId` (`onDelete: Restrict`), migracja `add_application`
+- [x] Ikony w bazie (bytea), serwowane read-only route handlerem `GET /api/applications/[id]/icon` (`requireUser`, `nosniff`, cache immutable, `?v=iconUpdatedAt`)
+- [x] Akcje ADMIN (`app/actions/applications.ts`): create/update/`setActive`, `uploadApplicationIcon` (upload z urządzenia), `removeApplicationIcon`
+- [x] Panel `/admin/applications` (+`new`, `[id]/edit` z uploadem/podglądem/usuwaniem ikony); kafelek w hubie `/admin`
+- [x] Komponent `AppIcon` (`1em` → auto-skalowanie do fontu nazwy) przy nazwie wersji: dashboard, `/versions/[id]`, `/versions`, `/archive`
+- [x] Wybór aplikacji przy tworzeniu wersji (opcjonalny) + zmiana aplikacji na otwartej wersji (`setVersionApplication`, read-only na zamkniętej)
+- [x] Filtrowanie po aplikacji (chipy GET) na dashboardzie, `/versions`, `/archive`
+- [x] Seed: 2 przykładowe aplikacje (bez ikon)
+
+### Decyzje
+- **Relacja opcjonalna (nullable)** — istniejące wersje zostają bez aplikacji, migracja bez backfillu.
+  Aplikacja podana przy tworzeniu/zmianie musi istnieć i być aktywna (walidacja w akcji).
+- **Ikony w bazie (bytea), nie na dysku** — jeden kontener, ikony małe; brak nowego wolumenu,
+  przetrwają redeploy. Serwowane route handlerem (read, nie mutacja → dozwolone poza Server Action).
+  `iconData` (bajty) **nigdy** w zapytaniach list/kart — tylko `id/name/iconType/iconUpdatedAt`.
+- **Bez nowej zależności (bez `sharp`)** — walidacja MIME (PNG/WebP/JPEG) + limit **100 KB**,
+  zapis surowych bajtów. CSS skaluje `1em` (`object-contain`). Zatwierdzone formaty: rastry
+  (SVG świadomie poza listą — mniejsza powierzchnia; serwowanie i tak z `nosniff`).
+- **Zmiana aplikacji wersji logowana do ChangeLog** (`entityType='Version'`, `field='application'`,
+  stara→nowa nazwa) w tej samej transakcji przez `logChange` — rozszerza reguła 27 świadomie,
+  na wniosek użytkownika. CRUD samych aplikacji (jak szablony/instancje) **nie** idzie do ChangeLog.
+- **Zero hard delete** — dezaktywacja aplikacji przez `isActive`; nieaktywna znika z selektorów
+  i (co do zasady) z chipów, ale istniejące wersje zachowują ikonę/nazwę. Chipy filtra = aktywne
+  aplikacje ∪ aplikacje faktycznie użyte w danym widoku (nieaktywna z wersją nadal ma chip);
+  „Usuń ikonę" czyści atrybut, nie kasuje rekordu.
+- **Kontrolka zmiany aplikacji** to natywny `<select>` z tokenami (nie współdzielony `Select`,
+  który ma `w-full` — `cn` nie robi tailwind-merge, notatka z Kroku UI-1), żeby uniknąć walki o szerokość.
+
+### Odłożone
+- Grupowanie/nagłówki sekcji po aplikacji na dashboardzie — na razie ikona-marker + filtr wystarczają.
+- Placeholder-monogram gdy brak ikony — pomijany w wersjach (ikona renderowana tylko gdy jest);
+  w panelu admina pusty kafelek pokazuje przerywaną ramkę.
+- Normalizacja/resize ikon (kwadrat, stały rozmiar) — gdyby zaszła potrzeba, osobno z `sharp` (za zgodą).
+
+### Jak sprawdzić
+- `/admin/applications` (ADMIN): dodaj aplikację, wejdź w edycję, wgraj ikonę (PNG/WebP/JPEG ≤100 KB),
+  podgląd się odświeża; „Usuń ikonę" czyści; dezaktywacja chowa z selektorów
+- Utwórz wersję z aplikacją → ikona przy nazwie na dashboardzie i w widoku wersji, skaluje się z fontem
+- Na otwartej wersji zmień aplikację → wpis w `/admin/changelog` (Wersja / aplikacja / stara → nowa)
+- Filtr po aplikacji na dashboardzie/`/versions`/`/archive`; „Bez aplikacji" pokazuje wersje bez przypisania
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + curl, fixture wstrzyknięty i posprzątany):**
+- Migracja `20260804082408_add_application` — kolumna nullable + tabela + FK RESTRICT (bez utraty danych).
+- Ikona serwowana: `GET /api/applications/[id]/icon` → **200 `image/png`**, `X-Content-Type-Options: nosniff`,
+  cache immutable; **bez cookie → 307 `/login`** (brama middleware). `naturalWidth=1` (bajty dotarły).
+- **Auto-skalowanie:** ta sama ikona **14 px** w chipie (text-sm) vs **18 px** na karcie (text-lg).
+- **Filtr:** `?app=<id>` → tylko wersje tej aplikacji; `?app=none` → wersje bez aplikacji; brak → wszystkie;
+  aktywny chip poprawny; łączenie z filtrem statusu w `/archive` zachowuje oba parametry.
+- **Zmiana aplikacji wersji** przez UI → baza zaktualizowana + **ChangeLog**: `Version` / `application` /
+  „Portal klienta → Aplikacja mobilna"; changelog renderuje etykiety PL, filtr `entityType=Version` działa.
+- `npm run check` czysto, `npm run build` (21 tras, w tym `/api/applications/[id]/icon`, `/admin/applications*`),
+  `npx vitest run` → **33/33**, `npm run seed` idempotentny (`applications=2`),
+  `docker compose up --build` startuje („No pending migrations", Ready, `/health` 200).
 
 ---
 

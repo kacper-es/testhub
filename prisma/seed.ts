@@ -160,18 +160,37 @@ async function seedInstances() {
   }
 }
 
+async function seedApplications() {
+  // Przykładowe aplikacje bez ikon (ikony wgrywa admin z urządzenia).
+  // Idempotencja po deterministycznym id.
+  const apps: Prisma.ApplicationUncheckedCreateInput[] = [
+    { id: 'seed-app-portal', name: 'Portal klienta', sortOrder: 10 },
+    { id: 'seed-app-mobile', name: 'Aplikacja mobilna', sortOrder: 20 },
+  ]
+
+  for (const app of apps) {
+    await prisma.application.upsert({
+      where: { id: app.id },
+      update: {},
+      create: app,
+    })
+  }
+}
+
 async function main() {
   await seedUsers()
   await seedTaskTemplates()
   await seedInstances()
+  await seedApplications()
 
-  const [users, templates, instances] = await Promise.all([
+  const [users, templates, instances, applications] = await Promise.all([
     prisma.user.count(),
     prisma.taskTemplate.count(),
     prisma.instance.count(),
+    prisma.application.count(),
   ])
   console.log(
-    `Seed done: users=${users}, taskTemplates=${templates}, instances=${instances}`,
+    `Seed done: users=${users}, taskTemplates=${templates}, instances=${instances}, applications=${applications}`,
   )
 }
 

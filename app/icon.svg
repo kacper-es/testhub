@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Release Hub">
+  <style>
+    .tile { fill: #1a1d24; }
+    .letters { fill: #fafaf7; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #e6e9ef; }
+      .letters { fill: #12151c; }
+    }
+  </style>
+  <rect class="tile" width="256" height="256" rx="56"/>
+  <text class="letters" x="128" y="175" text-anchor="middle"
+        font-family="Arial, Helvetica, system-ui, sans-serif" font-weight="700" font-size="132">RH</text>
+</svg>

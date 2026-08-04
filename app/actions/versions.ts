@@ -6,9 +6,11 @@ import { Prisma, type VersionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth/authz'
 import { assertVersionEditable } from '@/lib/versions/guard'
+import { logChange } from '@/lib/versions/log-change'
 import {
   cancelVersionSchema,
   createVersionSchema,
+  setVersionApplicationSchema,
 } from '@/lib/validation/version'
 
 export type CreateVersionState = { error?: string }
@@ -26,11 +28,21 @@ export async function createVersion(
   const parsed = createVersionSchema.safeParse({
     name: formData.get('name'),
     releaseDate: formData.get('releaseDate'),
+    applicationId: formData.get('applicationId') ?? '',
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane' }
   }
-  const { name, releaseDate } = parsed.data
+  const { name, releaseDate, applicationId } = parsed.data
+
+  // Aplikacja opcjonalna — jeśli podana, musi istnieć i być aktywna.
+  if (applicationId) {
+    const app = await prisma.application.findFirst({
+      where: { id: applicationId, isActive: true },
+      select: { id: true },
+    })
+    if (!app) return { error: 'Wybrana aplikacja jest niedostępna' }
+  }
 
   // Zbiór zadań/instancji zamrożony w chwili utworzenia (reguła 5): aktywne
   // szablony i aktywne instancje.
@@ -46,6 +58,7 @@ export async function createVersion(
           name,
           releaseDate: parseDateOnly(releaseDate),
           createdById: user.id,
+          applicationId,
         },
       })
       if (templates.length > 0) {
@@ -182,4 +195,57 @@ export async function reopenVersion(formData: FormData): Promise<void> {
   })
 
   revalidatePath('/versions')
+}
+
+// Zmiana aplikacji wersji — tylko na otwartej wersji (read-only na zamkniętej,
+// reguła 12). Zapisywana do ChangeLog (stara→nowa nazwa) w tej samej transakcji.
+export async function setVersionApplication(formData: FormData): Promise<void> {
+  const user = await requireRole(['TESTER', 'ADMIN'])
+  const parsed = setVersionApplicationSchema.safeParse({
+    versionId: formData.get('versionId'),
+    applicationId: formData.get('applicationId') ?? '',
+  })
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane')
+  }
+  const { versionId, applicationId } = parsed.data
+
+  await prisma.$transaction(async (tx) => {
+    const version = await tx.version.findUnique({
+      where: { id: versionId },
+      select: { status: true, application: { select: { name: true } } },
+    })
+    if (!version) throw new Error('Nie znaleziono wersji')
+    assertVersionEditable(version.status)
+
+    let newName: string | null = null
+    if (applicationId) {
+      const app = await tx.application.findFirst({
+        where: { id: applicationId, isActive: true },
+        select: { name: true },
+      })
+      if (!app) throw new Error('Wybrana aplikacja jest niedostępna')
+      newName = app.name
+    }
+
+    const oldName = version.application?.name ?? null
+    if (oldName === newName) return
+
+    await tx.version.update({
+      where: { id: versionId },
+      data: { applicationId },
+    })
+    await logChange(tx, {
+      entityType: 'Version',
+      entityId: versionId,
+      versionId,
+      field: 'application',
+      oldValue: oldName,
+      newValue: newName,
+      userId: user.id,
+    })
+  })
+
+  revalidatePath(`/versions/${versionId}`)
+  revalidatePath('/')
 }

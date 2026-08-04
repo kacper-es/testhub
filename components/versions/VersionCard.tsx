@@ -14,6 +14,7 @@ import {
 import { TASK_STATUS_META } from '@/lib/versions/task-status'
 import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge'
 import { StepDots } from '@/components/ui/StepDots'
+import { AppIcon } from '@/components/versions/AppIcon'
 import { cn } from '@/lib/cn'
 
 // Karta wersji IN_PROGRESS na dashboardzie (sekcja 8.2). Klikalna do widoku wersji.
@@ -21,6 +22,14 @@ export type DashboardVersion = Prisma.VersionGetPayload<{
   include: {
     tasks: { include: { taskTemplate: true } }
     testRuns: true
+    application: {
+      select: {
+        id: true
+        name: true
+        iconType: true
+        iconUpdatedAt: true
+      }
+    }
   }
 }>
 
@@ -83,7 +92,10 @@ export function VersionCard({
       className="block rounded-lg border border-border bg-surface p-4 shadow-sm transition-colors hover:bg-surface-raised"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-mono text-lg font-semibold">{version.name}</span>
+        <span className="flex items-center gap-2 font-mono text-lg font-semibold">
+          <AppIcon app={version.application} />
+          {version.name}
+        </span>
         <StatusBadge status={u.level}>{countdown}</StatusBadge>
       </div>
       <div className="mt-1 font-mono text-xs text-muted">

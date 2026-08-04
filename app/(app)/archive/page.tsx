@@ -3,8 +3,15 @@ import type { VersionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireUser } from '@/lib/auth/authz'
 import { toDateOnly } from '@/lib/versions/deadline'
+import {
+  appVersionWhere,
+  getFilterApps,
+  parseAppFilter,
+} from '@/lib/versions/app-filter'
 import { Card } from '@/components/ui/Card'
 import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge'
+import { AppIcon } from '@/components/versions/AppIcon'
+import { AppFilterNav } from '@/components/versions/AppFilterNav'
 import { cn } from '@/lib/cn'
 
 const STATUS: Record<
@@ -17,11 +24,20 @@ const STATUS: Record<
 
 type Filter = 'all' | 'released' | 'cancelled'
 
-const FILTERS: { key: Filter; label: string; href: string }[] = [
-  { key: 'all', label: 'Wszystkie', href: '/archive' },
-  { key: 'released', label: 'Wydane', href: '/archive?status=released' },
-  { key: 'cancelled', label: 'Anulowane', href: '/archive?status=cancelled' },
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'Wszystkie' },
+  { key: 'released', label: 'Wydane' },
+  { key: 'cancelled', label: 'Anulowane' },
 ]
+
+// Buduje /archive?… zachowując oba filtry (status + aplikacja), pomijając domyślne.
+function archiveHref(status: Filter, appValue: string): string {
+  const params = new URLSearchParams()
+  if (status !== 'all') params.set('status', status)
+  if (appValue !== 'all') params.set('app', appValue)
+  const qs = params.toString()
+  return qs ? `/archive?${qs}` : '/archive'
+}
 
 const closedFmt = new Intl.DateTimeFormat('pl-PL', {
   dateStyle: 'medium',
@@ -42,17 +58,32 @@ function statusesFor(filter: Filter): VersionStatus[] {
 export default async function ArchivePage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>
+  searchParams: Promise<{ status?: string; app?: string }>
 }) {
   await requireUser()
-  const { status } = await searchParams
+  const { status, app } = await searchParams
   const filter = parseFilter(status)
+  const appFilter = parseAppFilter(app)
 
-  const versions = await prisma.version.findMany({
-    where: { status: { in: statusesFor(filter) } },
-    orderBy: { statusChangedAt: 'desc' },
-    include: { statusChangedBy: true },
-  })
+  const scopeWhere = { status: { in: statusesFor(filter) } }
+  const [versions, filterApps] = await Promise.all([
+    prisma.version.findMany({
+      where: { ...scopeWhere, ...appVersionWhere(appFilter) },
+      orderBy: { statusChangedAt: 'desc' },
+      include: {
+        statusChangedBy: true,
+        application: {
+          select: {
+            id: true,
+            name: true,
+            iconType: true,
+            iconUpdatedAt: true,
+          },
+        },
+      },
+    }),
+    getFilterApps(scopeWhere),
+  ])
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
@@ -67,7 +98,7 @@ export default async function ArchivePage({
         {FILTERS.map((f) => (
           <Link
             key={f.key}
-            href={f.href}
+            href={archiveHref(f.key, appFilter)}
             className={cn(
               'rounded-full border px-3 py-1 text-sm',
               f.key === filter
@@ -79,6 +110,13 @@ export default async function ArchivePage({
           </Link>
         ))}
       </nav>
+
+      <AppFilterNav
+        apps={filterApps.apps}
+        hasNone={filterApps.hasNone}
+        current={appFilter}
+        hrefFor={(value) => archiveHref(filter, value)}
+      />
 
       {versions.length === 0 ? (
         <p className="text-muted">Brak wersji w tym filtrze.</p>
@@ -92,8 +130,9 @@ export default async function ArchivePage({
                   <div className="flex items-center gap-3">
                     <Link
                       href={`/versions/${v.id}`}
-                      className="font-mono text-lg underline"
+                      className="inline-flex items-center gap-2 font-mono text-lg underline"
                     >
+                      <AppIcon app={v.application} />
                       {v.name}
                     </Link>
                     <StatusBadge status={s.badge}>{s.label}</StatusBadge>

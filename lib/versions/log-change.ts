@@ -4,7 +4,7 @@ import type { Prisma } from '@prisma/client'
 // (reguła 28). Logujemy tylko: 4 flagi i notes w InstanceTestRun oraz status
 // i manualCounter* w VersionTask (reguła 27). Pierwszy wywołujący: krok 6a.
 export type LogChangeInput = {
-  entityType: 'InstanceTestRun' | 'VersionTask'
+  entityType: 'InstanceTestRun' | 'VersionTask' | 'Version'
   entityId: string
   versionId: string | null
   field: string

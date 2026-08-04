@@ -7,9 +7,16 @@ import {
   releaseVersion,
   reopenVersion,
 } from '@/app/actions/versions'
+import {
+  appVersionWhere,
+  getFilterApps,
+  parseAppFilter,
+} from '@/lib/versions/app-filter'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge'
+import { AppIcon } from '@/components/versions/AppIcon'
+import { AppFilterNav } from '@/components/versions/AppFilterNav'
 
 const STATUS: Record<VersionStatus, { label: string; badge: BadgeStatus }> = {
   IN_PROGRESS: { label: 'W przygotowaniu', badge: 'warn' },
@@ -21,15 +28,39 @@ function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 10)
 }
 
-export default async function VersionsPage() {
+export default async function VersionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ app?: string }>
+}) {
   const user = await requireUser()
   const canEdit = user.role === 'TESTER' || user.role === 'ADMIN'
   const isAdmin = user.role === 'ADMIN'
 
-  const versions = await prisma.version.findMany({
-    orderBy: [{ status: 'asc' }, { releaseDate: 'asc' }],
-    include: { _count: { select: { tasks: true, testRuns: true } } },
-  })
+  const { app } = await searchParams
+  const appFilter = parseAppFilter(app)
+
+  const [versions, filterApps] = await Promise.all([
+    prisma.version.findMany({
+      where: appVersionWhere(appFilter),
+      orderBy: [{ status: 'asc' }, { releaseDate: 'asc' }],
+      include: {
+        _count: { select: { tasks: true, testRuns: true } },
+        application: {
+          select: {
+            id: true,
+            name: true,
+            iconType: true,
+            iconUpdatedAt: true,
+          },
+        },
+      },
+    }),
+    getFilterApps({}),
+  ])
+
+  const hrefFor = (value: string) =>
+    value === 'all' ? '/versions' : `/versions?app=${encodeURIComponent(value)}`
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
@@ -47,9 +78,18 @@ export default async function VersionsPage() {
         )}
       </header>
 
+      <AppFilterNav
+        apps={filterApps.apps}
+        hasNone={filterApps.hasNone}
+        current={appFilter}
+        hrefFor={hrefFor}
+      />
+
       {versions.length === 0 ? (
         <p className="text-muted">
-          Brak wersji w przygotowaniu — dodaj pierwszą.
+          {appFilter === 'all'
+            ? 'Brak wersji w przygotowaniu — dodaj pierwszą.'
+            : 'Brak wersji dla tego filtra.'}
         </p>
       ) : (
         <div className="flex flex-col gap-3">
@@ -61,8 +101,9 @@ export default async function VersionsPage() {
                   <div className="flex items-center gap-3">
                     <Link
                       href={`/versions/${v.id}`}
-                      className="font-mono text-lg underline"
+                      className="inline-flex items-center gap-2 font-mono text-lg underline"
                     >
+                      <AppIcon app={v.application} />
                       {v.name}
                     </Link>
                     <StatusBadge status={s.badge}>{s.label}</StatusBadge>

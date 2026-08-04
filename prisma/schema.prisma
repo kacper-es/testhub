@@ -82,16 +82,35 @@ model Version {
   statusChangedById String?
   statusChangedAt   DateTime?
   cancelReason      String?
+  applicationId     String?
   createdAt         DateTime      @default(now())
 
-  createdBy       User  @relation("CreatedVersions", fields: [createdById], references: [id], onDelete: Restrict)
-  statusChangedBy User? @relation("StatusChangedVersions", fields: [statusChangedById], references: [id], onDelete: Restrict)
+  createdBy       User         @relation("CreatedVersions", fields: [createdById], references: [id], onDelete: Restrict)
+  statusChangedBy User?        @relation("StatusChangedVersions", fields: [statusChangedById], references: [id], onDelete: Restrict)
+  application     Application? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
 
   tasks    VersionTask[]
   testRuns InstanceTestRun[]
   comments VersionComment[]
 
   @@index([status, releaseDate])
+  @@index([applicationId])
+}
+
+// Aplikacja = najprostszy podział wersji na produkty. Ikona (małe bajty)
+// trzymana w bazie i serwowana read-only route handlerem. Zero hard delete —
+// dezaktywacja przez isActive (jak Instance/TaskTemplate).
+model Application {
+  id            String    @id @default(cuid())
+  name          String    @unique
+  iconData      Bytes?
+  iconType      String?
+  iconUpdatedAt DateTime?
+  isActive      Boolean   @default(true)
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  versions Version[]
 }
 
 model TaskTemplate {

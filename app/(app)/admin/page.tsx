@@ -12,6 +12,11 @@ export default async function AdminPage() {
       desc: 'Dodawanie, edycja, kolejność, dezaktywacja. Zmiany działają na żywo w otwartych wersjach.',
     },
     {
+      href: '/admin/applications',
+      title: 'Aplikacje',
+      desc: 'Aplikacje, do których przypisujesz wersje. Dodawanie ikon (upload z urządzenia), dezaktywacja.',
+    },
+    {
       href: '/admin/users',
       title: 'Konta',
       desc: 'Tworzenie kont z hasłem tymczasowym, reset hasła, rola, dezaktywacja.',

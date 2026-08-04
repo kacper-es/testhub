@@ -10,6 +10,7 @@ const PAGE_SIZE = 50
 const ENTITY_LABEL: Record<string, string> = {
   InstanceTestRun: 'Instancja',
   VersionTask: 'Zadanie',
+  Version: 'Wersja',
 }
 
 const FIELD_LABEL: Record<string, string> = {
@@ -21,6 +22,7 @@ const FIELD_LABEL: Record<string, string> = {
   backendUpdated: 'backend podbity',
   testsCompleted: 'testy wykonane',
   notes: 'notatki',
+  application: 'aplikacja',
 }
 
 const fmt = new Intl.DateTimeFormat('pl-PL', {
@@ -61,7 +63,11 @@ export default async function ChangelogPage({
   const where: Prisma.ChangeLogWhereInput = {}
   if (sp.versionId) where.versionId = sp.versionId
   if (sp.userId) where.userId = sp.userId
-  if (sp.entityType === 'InstanceTestRun' || sp.entityType === 'VersionTask') {
+  if (
+    sp.entityType === 'InstanceTestRun' ||
+    sp.entityType === 'VersionTask' ||
+    sp.entityType === 'Version'
+  ) {
     where.entityType = sp.entityType
   }
   if (sp.from || sp.to) {
@@ -146,6 +152,7 @@ export default async function ChangelogPage({
             <option value="">Wszystkie</option>
             <option value="InstanceTestRun">Instancja</option>
             <option value="VersionTask">Zadanie</option>
+            <option value="Version">Wersja</option>
           </select>
         </label>
 
