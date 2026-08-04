@@ -60,9 +60,6 @@ export default async function DashboardPage() {
             Panel administratora →
           </Link>
         )}
-        <Link className="text-muted underline" href="/design">
-          Galeria komponentów →
-        </Link>
       </nav>
 
       <section className="flex flex-col gap-3">

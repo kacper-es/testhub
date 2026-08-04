@@ -3,12 +3,9 @@
 import { useActionState } from 'react'
 import type { InstanceFormState } from '@/app/actions/instances'
 import { Button } from '@/components/ui/Button'
+import { Field, Input, Textarea } from '@/components/ui/Input'
 
 const initial: InstanceFormState = {}
-
-const field = 'flex flex-col gap-1'
-const input =
-  'rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg'
 
 export function InstanceForm({
   action,
@@ -35,40 +32,32 @@ export function InstanceForm({
         <input type="hidden" name="id" value={initialValues.id} />
       )}
 
-      <label className={field}>
-        <span className="text-sm font-medium">Nazwa</span>
-        <input
-          className={input}
+      <Field label="Nazwa">
+        <Input
           name="name"
           required
           defaultValue={initialValues?.name ?? ''}
           placeholder="Klient A — produkcja-mirror"
         />
-      </label>
+      </Field>
 
-      <label className={field}>
-        <span className="text-sm font-medium">
-          Klient <span className="text-muted">(opcjonalnie)</span>
-        </span>
-        <input
-          className={input}
+      <Field label="Klient" optional>
+        <Input
           name="clientName"
           defaultValue={initialValues?.clientName ?? ''}
           placeholder="Klient A"
         />
-      </label>
+      </Field>
 
-      <label className={field}>
-        <span className="text-sm font-medium">Kluczowe funkcjonalności</span>
-        <textarea
-          className={input}
+      <Field label="Kluczowe funkcjonalności">
+        <Textarea
           name="keyFunctionalities"
           required
           rows={4}
           defaultValue={initialValues?.keyFunctionalities ?? ''}
           placeholder="Moduł płatności, integracja z ERP, raporty…"
         />
-      </label>
+      </Field>
 
       {state.error && (
         <p role="alert" className="text-sm text-fail-strong">

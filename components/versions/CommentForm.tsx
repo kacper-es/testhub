@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { addComment } from '@/app/actions/comments'
 import { Button } from '@/components/ui/Button'
+import { Textarea } from '@/components/ui/Input'
 
 export function CommentForm({ versionId }: { versionId: string }) {
   const [content, setContent] = useState('')
@@ -24,13 +25,12 @@ export function CommentForm({ versionId }: { versionId: string }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-2">
-      <textarea
+      <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
         rows={3}
         placeholder="Dodaj komentarz…"
         aria-label="Treść komentarza"
-        className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
       />
       {error && (
         <p role="alert" className="text-sm text-fail-strong">

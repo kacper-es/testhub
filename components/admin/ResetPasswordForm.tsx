@@ -3,6 +3,7 @@
 import { useActionState } from 'react'
 import { resetUserPassword, type UserFormState } from '@/app/actions/users'
 import { Button } from '@/components/ui/Button'
+import { Field, Input } from '@/components/ui/Input'
 
 const initial: UserFormState = {}
 
@@ -12,21 +13,18 @@ export function ResetPasswordForm({ userId }: { userId: string }) {
   return (
     <form action={formAction} className="flex max-w-md flex-col gap-2">
       <input type="hidden" name="id" value={userId} />
-      <label className="flex flex-col gap-1">
-        <span className="text-sm font-medium">Nowe hasło tymczasowe</span>
-        <input
-          className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
+      <Field
+        label="Nowe hasło tymczasowe"
+        hint="Reset wyloguje użytkownika ze wszystkich sesji i wymusi zmianę hasła przy następnym logowaniu."
+      >
+        <Input
           name="password"
           type="text"
           required
           minLength={8}
           placeholder="min. 8 znaków"
         />
-      </label>
-      <span className="text-xs text-muted">
-        Reset wyloguje użytkownika ze wszystkich sesji i wymusi zmianę hasła przy
-        następnym logowaniu.
-      </span>
+      </Field>
       {state.error && (
         <p role="alert" className="text-sm text-fail-strong">
           {state.error}

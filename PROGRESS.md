@@ -633,6 +633,51 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 Wszystkie kroki MVP z sekcji 12 zrobione i zweryfikowane. Pozostaje opcjonalny krok 11 (SSE) po MVP.
 
+## Krok UI-1 — Redesign ekranów auth + prymityw formularza `[x]`
+
+Po review UI: ekrany przed logowaniem (`/login`, `/change-password`) były jedynymi
+stronami omijającymi system tokenów — inline style, surowe `#ccc`, `sans-serif`,
+brak motywów, brak komponentów. Reszta aplikacji zbudowana poprawnie na tokenach.
+
+- [x] `components/ui/Input.tsx` — prymityw `Input`/`Textarea`/`Select`/`Field`
+  (jedyne źródło stylu kontrolek, zastępuje kopiowane po komponentach `field`/`input`)
+- [x] `components/Wordmark.tsx` — marka „RH" + nazwa, tylko tokeny, bez assetów
+- [x] `/login` i `/change-password` przeniesione na tokeny: wyśrodkowana karta,
+  wordmark, `Field`/`Input`, `Button`, komunikaty w kolorach statusowych, oba motywy
+- [x] Migracja formularzy aplikacji na prymityw: `InstanceForm`, `NewVersionForm`,
+  `TemplateForm`, `CreateUserForm`, `ResetPasswordForm`, `CommentForm`
+- [x] Usunięta galeria komponentów: link z dashboardu + trasa `/design` +
+  `components/design/Showcase.tsx` (dev-tool, niepotrzebny na produkcji)
+
+### Decyzje
+- **Zero nowej palety/fontów.** Baza design (ui-ux-pro-max) sugerowała niebiesko-zielony
+  „enterprise" + Fira — świadomie odrzucone: aplikacja ma zweryfikowany WCAG system tokenów
+  (IBM Plex Sans) i inwariant „zero surowych kolorów / bez nowych zależności". Atrakcyjność
+  z układu, odstępów, elewacji i marki — nie z nowych kolorów.
+- **Karta auth jako zwykły `div`** z `p-6` (nie komponent `Card`): `cn` nie robi
+  tailwind-merge, więc nadpisanie `p-4` z `Card` byłoby niejednoznaczne. Precyzyjny padding
+  bez walki z kolejnością CSS.
+- **`AttachInstance` i `NotesField` nietknięte** — to celowe warianty (inline select /
+  kompaktowa kontrolka w komórce tabeli z logiką focus/dirty), już na tokenach.
+- Bez zmian `schema.prisma`, bez nowych zależności, bez zmian logiki serwerowej/akcji.
+
+### Odłożone
+- Przełącznik motywu przed logowaniem — niski priorytet (7 wewnętrznych userów, root layout
+  i tak czyta cookie motywu zalogowanego).
+- Ewentualny wariant `Input` z `aria-invalid`/stanem błędu per pole — dodać, jeśli pojawi się
+  potrzeba walidacji inline.
+
+### Jak sprawdzić
+- `/login` w obu motywach: wyśrodkowana karta, wordmark, spójne pola, przycisk `w-full`
+- `/change-password` — ten sam układ; baner „musisz zmienić" w kolorze warn
+- Formularze admina/instancji/wersji renderują się identycznie jak wcześniej (ten sam wygląd pól)
+
+**Zweryfikowane w tej sesji:**
+- `npm run check` przechodzi (tsc czysto, `next lint` bez błędów).
+- Podgląd wizualny (oba motywy, dokładne wartości tokenów + fonty) pokazany jako widget.
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`

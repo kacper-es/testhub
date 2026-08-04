@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react'
 import type { DeadlineType, TaskType } from '@prisma/client'
 import type { TemplateFormState } from '@/app/actions/task-templates'
 import { Button } from '@/components/ui/Button'
+import { Field, Input, Select, Textarea } from '@/components/ui/Input'
 
 const initial: TemplateFormState = {}
 
@@ -12,10 +13,6 @@ const TASK_TYPE_LABEL: Record<TaskType, string> = {
   TICKET_AGGREGATE: 'Licznik ticketów — status z X/Y',
   INSTANCE_AGGREGATE: 'Agregat instancji — status wyliczany',
 }
-
-const field = 'flex flex-col gap-1'
-const input =
-  'rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg'
 
 export function TemplateForm({
   action,
@@ -51,93 +48,82 @@ export function TemplateForm({
         <input type="hidden" name="id" value={initialValues.id} />
       )}
 
-      <label className={field}>
-        <span className="text-sm font-medium">Nazwa</span>
-        <input
-          className={input}
+      <Field label="Nazwa">
+        <Input
           name="name"
           required
           defaultValue={initialValues?.name ?? ''}
           placeholder="Release notes dla klienta"
         />
-      </label>
+      </Field>
 
-      <label className={field}>
-        <span className="text-sm font-medium">
-          Opis <span className="text-muted">(opcjonalnie)</span>
-        </span>
-        <textarea
-          className={input}
+      <Field label="Opis" optional>
+        <Textarea
           name="description"
           rows={3}
           defaultValue={initialValues?.description ?? ''}
         />
-      </label>
+      </Field>
 
-      <div className={field}>
-        <span className="text-sm font-medium">Typ zadania</span>
-        {lockedTaskType ? (
-          <>
-            <div className={`${input} text-muted`}>
-              {TASK_TYPE_LABEL[lockedTaskType]}
-            </div>
-            <p className="text-xs text-muted">
-              Typ zadania jest niezmienny. Aby go zmienić — dezaktywuj szablon i
-              utwórz nowy.
-            </p>
-          </>
-        ) : (
-          <select
+      {lockedTaskType ? (
+        <div className="flex flex-col gap-1">
+          <span className="text-sm font-medium">Typ zadania</span>
+          <div className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">
+            {TASK_TYPE_LABEL[lockedTaskType]}
+          </div>
+          <p className="text-xs text-muted">
+            Typ zadania jest niezmienny. Aby go zmienić — dezaktywuj szablon i
+            utwórz nowy.
+          </p>
+        </div>
+      ) : (
+        <Field label="Typ zadania">
+          <Select
             name="taskType"
             required
             defaultValue={initialValues?.taskType ?? 'CHECKBOX'}
-            className={input}
           >
             {(Object.keys(TASK_TYPE_LABEL) as TaskType[]).map((t) => (
               <option key={t} value={t}>
                 {TASK_TYPE_LABEL[t]}
               </option>
             ))}
-          </select>
-        )}
-      </div>
+          </Select>
+        </Field>
+      )}
 
-      <label className={field}>
-        <span className="text-sm font-medium">Termin</span>
-        <select
+      <Field label="Termin">
+        <Select
           name="deadlineType"
-          className={input}
           value={deadlineType}
           onChange={(e) => setDeadlineType(e.target.value as DeadlineType)}
         >
           <option value="FLEXIBLE">Elastyczny (bez terminu)</option>
           <option value="DAYS_BEFORE_RELEASE">Dni przed wydaniem</option>
-        </select>
-      </label>
+        </Select>
+      </Field>
 
       {deadlineType === 'DAYS_BEFORE_RELEASE' && (
-        <label className={field}>
-          <span className="text-sm font-medium">Dni przed wydaniem</span>
-          <input
-            className={`${input} font-mono`}
+        <Field label="Dni przed wydaniem">
+          <Input
+            className="font-mono"
             name="daysBeforeRelease"
             type="number"
             min={0}
             defaultValue={initialValues?.daysBeforeRelease ?? ''}
           />
-        </label>
+        </Field>
       )}
 
-      <label className={field}>
-        <span className="text-sm font-medium">Kolejność</span>
-        <input
-          className={`${input} font-mono`}
+      <Field label="Kolejność">
+        <Input
+          className="font-mono"
           name="sortOrder"
           type="number"
           required
           defaultValue={initialValues?.sortOrder ?? 0}
         />
-      </label>
+      </Field>
 
       {state.error && (
         <p role="alert" className="text-sm text-fail-strong">
