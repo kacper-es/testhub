@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { TaskStatus, VersionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -212,10 +211,7 @@ export default async function VersionDetailPage({
       {/* Polling 5 s — odświeża Server Components (sekcja 7). */}
       {!closed && <LivePolling />}
       <div>
-        <Link href="/versions" className="text-sm text-muted underline">
-          ← Wersje
-        </Link>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <h1 className="flex items-center gap-2 font-mono text-2xl font-semibold">
             <AppIcon app={version.application} />
             {version.name}

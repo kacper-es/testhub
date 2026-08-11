@@ -23,10 +23,7 @@ export default async function UsersPage() {
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link href="/admin" className="text-sm text-muted underline">
-            ← Panel administratora
-          </Link>
-          <h1 className="mt-2 text-2xl font-semibold">Konta</h1>
+          <h1 className="text-2xl font-semibold">Konta</h1>
         </div>
         <Link href="/admin/users/new">
           <Button variant="primary">Nowe konto</Button>

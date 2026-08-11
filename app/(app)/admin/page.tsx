@@ -31,10 +31,7 @@ export default async function AdminPage() {
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       <div>
-        <Link href="/" className="text-sm text-muted underline">
-          ← Dashboard
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold">Panel administratora</h1>
+        <h1 className="text-2xl font-semibold">Panel administratora</h1>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

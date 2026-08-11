@@ -19,10 +19,7 @@ export default async function InstancesPage() {
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <Link href="/" className="text-sm text-muted underline">
-            ← Dashboard
-          </Link>
-          <h1 className="mt-2 text-2xl font-semibold">Katalog instancji</h1>
+          <h1 className="text-2xl font-semibold">Katalog instancji</h1>
         </div>
         {canEdit && (
           <Link href="/instances/new">

@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { requireRolePage } from '@/lib/auth/authz'
@@ -34,13 +33,7 @@ export default async function EditApplicationPage({
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-8 p-6">
       <div>
-        <Link
-          href="/admin/applications"
-          className="text-sm text-muted underline"
-        >
-          ← Aplikacje
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold">Edytuj aplikację</h1>
+        <h1 className="text-2xl font-semibold">Edytuj aplikację</h1>
       </div>
 
       <ApplicationForm

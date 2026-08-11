@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import type { Role } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
@@ -33,10 +32,7 @@ export default async function ManageUserPage({
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
       <div>
-        <Link href="/admin/users" className="text-sm text-muted underline">
-          ← Konta
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold">{user.name}</h1>
+        <h1 className="text-2xl font-semibold">{user.name}</h1>
         <p className="font-mono text-sm text-muted">{user.email}</p>
         <div className="mt-2 flex gap-2">
           {user.isActive ? (

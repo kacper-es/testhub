@@ -88,10 +88,7 @@ export default async function ArchivePage({
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       <div>
-        <Link href="/" className="text-sm text-muted underline">
-          ← Dashboard
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold">Archiwum</h1>
+        <h1 className="text-2xl font-semibold">Archiwum</h1>
       </div>
 
       <nav className="flex flex-wrap gap-2">

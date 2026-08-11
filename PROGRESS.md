@@ -745,6 +745,65 @@ przez małą ikonę przy nazwie + panel admina do zarządzania aplikacjami i wgr
 
 ---
 
+## Krok UI-2 — Wspólny header, nawigacja i okruszki `[x]`
+
+Redesign górnej części na życzenie po review UX: nawigacja i przełącznik motywu /
+wylogowanie istniały tylko na dashboardzie, brak „home", niespójne back-linki
+(z widoku wersji dwa kliki do dashboardu). Cel: jeden współdzielony chrome na
+każdej zalogowanej stronie.
+
+- [x] `lib/nav.ts` — czysty moduł: `NAV_ITEMS`, `isNavItemActive`, `buildBreadcrumbs`
+- [x] `components/nav/AppHeader.tsx` (server) — sticky pasek: marka=home + `AppNav`
+  + `ThemeToggle` + chip „Imię (ROLA)" + „Wyloguj"
+- [x] `components/nav/AppNav.tsx` (client) — sekcje z aktywnym stanem (`usePathname`)
+- [x] `components/nav/Breadcrumbs.tsx` (client) — okruszki ze ścieżki, ukryte na dashboardzie
+- [x] Chrome zamontowany w `(app)/layout.tsx` (ma usera z `requireUser`)
+- [x] Usunięty inline header + nav z dashboardu; nagłówek sekcji → `<h1>`
+- [x] Usunięte bespoke back-linki („← …") z 17 podstron + martwe importy `Link`
+
+### Decyzje
+- **Wybór użytkownika (AskUserQuestion):** górny pasek (nie sidebar/hybryda);
+  breadcrumbs TAK; tożsamość jako widoczny chip + przycisk (nie dropdown).
+- **Breadcrumbs generyczne, w pełni automatyczne ze ścieżki** — zero propsów per
+  strona (świadomy wybór „mniej dłubaniny"). Segment dynamiczny (id) dostaje
+  generyczne słowo (`Szczegóły`) i tylko gdy jest ostatni; pośredni segment id
+  (np. `templates/[id]/edit`) jest pomijany → `… / Szablony zadań / Edycja`.
+- **Aktywny stan sekcji = `usePathname`**, więc `AppNav`/`Breadcrumbs` to cienkie
+  komponenty klienckie; `AppHeader` i reszta stron zostają Server Components.
+- **Aktywny wygląd = `bg-fg text-bg`** (wzorzec „zaznaczenia" z appki, jak aktywny
+  `ThemeToggle`) — brak tokena `accent`, nie dokładam nowego koloru.
+- **Marka w pasku = kompaktowy inline lockup** (kafelek „RH" + „Release Hub"),
+  nie pionowy `Wordmark` (ten zostaje na ekranach auth — inna forma). Te same
+  tokeny (`bg-fg`/`text-bg`/`font-mono`), zero nowych assetów.
+- **Kolumna chrome `max-w-6xl px-6`** (pasek + okruszki); strony zachowują własne
+  `max-w-2xl/4xl/5xl` centrowane. Sticky pasek, breadcrumb scrolluje się z treścią.
+- Bez zmian `schema.prisma`, bez nowych zależności, tylko tokeny CSS,
+  `prefers-reduced-motion` (globalnie), teksty PL.
+
+### Odłożone
+- Hamburger na mobile — 5 pozycji zawija się pod markę, wystarcza (≤375 px).
+- Breadcrumb z realną nazwą obiektu (`9.9.9`, nazwa instancji) zamiast generycznego
+  słowa — wymaga przekazania kontekstu ze strony; do rozważenia, jeśli zajdzie potrzeba.
+- Przełącznik motywu przed logowaniem — nadal poza zakresem (jak w UI-1).
+
+### Jak sprawdzić
+- Z dowolnej podstrony: klik w „RH / Release Hub" → dashboard (jeden klik)
+- Motyw i „Wyloguj" dostępne na każdej stronie, nie tylko na `/`
+- Widok wersji: breadcrumb `Dashboard / Wersje / Szczegóły`, aktywna „Wersje”, brak „← Wersje”
+- `admin/templates/[id]/edit`: breadcrumb pomija id → `… / Szablony zadań / Edycja`
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + docker):**
+- `npm run check` czysto (tsc + ESLint), `npx vitest run` → **33/33**.
+- `docker compose up -d --build` startuje (health 200); `/`, `/versions` bez cookie → 307.
+- Zalogowany (admin): dashboard bez okruszków, shell z home/nav/motyw/chip/Wyloguj,
+  `<h1>` „Wersje w przygotowaniu”, brak starego zduplikowanego nagłówka.
+- Widok wersji: breadcrumb `Dashboard / Wersje / Szczegóły` (ostatni nielinkowany),
+  `activeNav=["Wersje"]`, `<main>` startuje od `9.9.9` (back-link usunięty).
+- `templates/[id]/edit`: breadcrumb `Dashboard / Panel administratora / Szablony zadań /
+  Edycja` (segment `seed-tpl-*` pominięty), `activeNav=["Admin"]`.
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`

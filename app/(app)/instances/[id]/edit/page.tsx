@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { requireRolePage } from '@/lib/auth/authz'
@@ -19,10 +18,7 @@ export default async function EditInstancePage({
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
       <div>
-        <Link href="/instances" className="text-sm text-muted underline">
-          ← Katalog instancji
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold">Edytuj instancję</h1>
+        <h1 className="text-2xl font-semibold">Edytuj instancję</h1>
       </div>
       <InstanceForm
         action={updateInstance}

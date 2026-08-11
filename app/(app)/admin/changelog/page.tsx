@@ -107,10 +107,7 @@ export default async function ChangelogPage({
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
       <div>
-        <Link href="/admin" className="text-sm text-muted underline">
-          ← Panel administratora
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold">Log zmian</h1>
+        <h1 className="text-2xl font-semibold">Log zmian</h1>
       </div>
 
       {/* Filtry — natywny formularz GET (bez klienta). */}
