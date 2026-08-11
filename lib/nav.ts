@@ -11,7 +11,6 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Dashboard' },
   { href: '/versions', label: 'Wersje' },
-  { href: '/instances', label: 'Instancje' },
   { href: '/archive', label: 'Archiwum' },
   { href: '/admin', label: 'Admin', adminOnly: true },
 ]

@@ -6,11 +6,12 @@ import { Prisma, type VersionStatus } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth/authz'
 import { assertVersionEditable } from '@/lib/versions/guard'
-import { logChange } from '@/lib/versions/log-change'
+import { logChange, type LogChangeInput } from '@/lib/versions/log-change'
+import { toDateOnly } from '@/lib/versions/deadline'
 import {
   cancelVersionSchema,
   createVersionSchema,
-  setVersionApplicationSchema,
+  updateVersionSchema,
 } from '@/lib/validation/version'
 
 export type CreateVersionState = { error?: string }
@@ -197,55 +198,102 @@ export async function reopenVersion(formData: FormData): Promise<void> {
   revalidatePath('/versions')
 }
 
-// Zmiana aplikacji wersji — tylko na otwartej wersji (read-only na zamkniętej,
-// reguła 12). Zapisywana do ChangeLog (stara→nowa nazwa) w tej samej transakcji.
-export async function setVersionApplication(formData: FormData): Promise<void> {
+export type UpdateVersionState = { error?: string }
+
+// Edycja wersji (nazwa, data wydania, aplikacja) — tylko na otwartej wersji
+// (read-only na zamkniętej, reguła 12). Każda zmieniona wartość idzie do ChangeLog
+// (stara→nowa) w tej samej transakcji co mutacja (reguły 27/28, rozszerzone o pola
+// Version na wniosek użytkownika). Zmiany statusu wersji nadal poza ChangeLog (reguła 30).
+export async function updateVersion(
+  _prev: UpdateVersionState,
+  formData: FormData,
+): Promise<UpdateVersionState> {
   const user = await requireRole(['TESTER', 'ADMIN'])
-  const parsed = setVersionApplicationSchema.safeParse({
+
+  const parsed = updateVersionSchema.safeParse({
     versionId: formData.get('versionId'),
+    name: formData.get('name'),
+    releaseDate: formData.get('releaseDate'),
     applicationId: formData.get('applicationId') ?? '',
   })
   if (!parsed.success) {
-    throw new Error(parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane')
+    return { error: parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane' }
   }
-  const { versionId, applicationId } = parsed.data
+  const { versionId, name, releaseDate, applicationId } = parsed.data
 
-  await prisma.$transaction(async (tx) => {
-    const version = await tx.version.findUnique({
-      where: { id: versionId },
-      select: { status: true, application: { select: { name: true } } },
-    })
-    if (!version) throw new Error('Nie znaleziono wersji')
-    assertVersionEditable(version.status)
-
-    let newName: string | null = null
-    if (applicationId) {
-      const app = await tx.application.findFirst({
-        where: { id: applicationId, isActive: true },
-        select: { name: true },
+  try {
+    await prisma.$transaction(async (tx) => {
+      const version = await tx.version.findUnique({
+        where: { id: versionId },
+        select: {
+          status: true,
+          name: true,
+          releaseDate: true,
+          applicationId: true,
+          application: { select: { name: true } },
+        },
       })
-      if (!app) throw new Error('Wybrana aplikacja jest niedostępna')
-      newName = app.name
+      if (!version) throw new Error('Nie znaleziono wersji')
+      assertVersionEditable(version.status)
+
+      const data: Prisma.VersionUncheckedUpdateInput = {}
+      const logs: LogChangeInput[] = []
+      const base = {
+        entityType: 'Version' as const,
+        entityId: versionId,
+        versionId,
+        userId: user.id,
+      }
+
+      if (name !== version.name) {
+        data.name = name
+        logs.push({ ...base, field: 'name', oldValue: version.name, newValue: name })
+      }
+
+      const oldDate = toDateOnly(version.releaseDate)
+      if (releaseDate !== oldDate) {
+        data.releaseDate = parseDateOnly(releaseDate)
+        logs.push({ ...base, field: 'releaseDate', oldValue: oldDate, newValue: releaseDate })
+      }
+
+      if (applicationId !== version.applicationId) {
+        // Zmiana aplikacji — jeśli podana, musi istnieć i być aktywna.
+        let newName: string | null = null
+        if (applicationId) {
+          const app = await tx.application.findFirst({
+            where: { id: applicationId, isActive: true },
+            select: { name: true },
+          })
+          if (!app) throw new Error('Wybrana aplikacja jest niedostępna')
+          newName = app.name
+        }
+        data.applicationId = applicationId
+        logs.push({
+          ...base,
+          field: 'application',
+          oldValue: version.application?.name ?? null,
+          newValue: newName,
+        })
+      }
+
+      if (logs.length === 0) return // nic się nie zmieniło
+
+      await tx.version.update({ where: { id: versionId }, data })
+      for (const entry of logs) await logChange(tx, entry)
+    })
+  } catch (e) {
+    if (
+      e instanceof Prisma.PrismaClientKnownRequestError &&
+      e.code === 'P2002'
+    ) {
+      return { error: `Wersja ${name} już istnieje` }
     }
-
-    const oldName = version.application?.name ?? null
-    if (oldName === newName) return
-
-    await tx.version.update({
-      where: { id: versionId },
-      data: { applicationId },
-    })
-    await logChange(tx, {
-      entityType: 'Version',
-      entityId: versionId,
-      versionId,
-      field: 'application',
-      oldValue: oldName,
-      newValue: newName,
-      userId: user.id,
-    })
-  })
+    throw e
+  }
 
   revalidatePath(`/versions/${versionId}`)
+  revalidatePath('/versions')
   revalidatePath('/')
+  revalidatePath('/archive')
+  redirect(`/versions/${versionId}`)
 }

@@ -1,14 +1,13 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
-import { requireUser } from '@/lib/auth/authz'
+import { requireRolePage } from '@/lib/auth/authz'
 import { setInstanceActive } from '@/app/actions/instances'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 
 export default async function InstancesPage() {
-  const user = await requireUser()
-  const canEdit = user.role === 'TESTER' || user.role === 'ADMIN'
+  await requireRolePage(['ADMIN'])
 
   const instances = await prisma.instance.findMany({
     orderBy: [{ isActive: 'desc' }, { name: 'asc' }],
@@ -21,11 +20,9 @@ export default async function InstancesPage() {
         <div>
           <h1 className="text-2xl font-semibold">Katalog instancji</h1>
         </div>
-        {canEdit && (
-          <Link href="/instances/new">
-            <Button variant="primary">Nowa instancja</Button>
-          </Link>
-        )}
+        <Link href="/admin/instances/new">
+          <Button variant="primary">Nowa instancja</Button>
+        </Link>
       </header>
 
       {instances.length === 0 ? (
@@ -55,29 +52,27 @@ export default async function InstancesPage() {
                 {i.keyFunctionalities}
               </p>
 
-              {canEdit && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link href={`/instances/${i.id}/edit`}>
-                    <Button variant="secondary" type="button">
-                      Edytuj
-                    </Button>
-                  </Link>
-                  <form action={setInstanceActive}>
-                    <input type="hidden" name="id" value={i.id} />
-                    <input
-                      type="hidden"
-                      name="active"
-                      value={i.isActive ? 'false' : 'true'}
-                    />
-                    <Button
-                      variant={i.isActive ? 'ghost' : 'secondary'}
-                      type="submit"
-                    >
-                      {i.isActive ? 'Dezaktywuj' : 'Aktywuj'}
-                    </Button>
-                  </form>
-                </div>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href={`/admin/instances/${i.id}/edit`}>
+                  <Button variant="secondary" type="button">
+                    Edytuj
+                  </Button>
+                </Link>
+                <form action={setInstanceActive}>
+                  <input type="hidden" name="id" value={i.id} />
+                  <input
+                    type="hidden"
+                    name="active"
+                    value={i.isActive ? 'false' : 'true'}
+                  />
+                  <Button
+                    variant={i.isActive ? 'ghost' : 'secondary'}
+                    type="submit"
+                  >
+                    {i.isActive ? 'Dezaktywuj' : 'Aktywuj'}
+                  </Button>
+                </form>
+              </div>
             </Card>
           ))}
         </div>

@@ -9,7 +9,7 @@ export default async function EditInstancePage({
 }: {
   params: Promise<{ id: string }>
 }) {
-  await requireRolePage(['TESTER', 'ADMIN'])
+  await requireRolePage(['ADMIN'])
   const { id } = await params
 
   const instance = await prisma.instance.findUnique({ where: { id } })

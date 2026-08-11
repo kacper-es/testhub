@@ -23,6 +23,8 @@ const FIELD_LABEL: Record<string, string> = {
   testsCompleted: 'testy wykonane',
   notes: 'notatki',
   application: 'aplikacja',
+  name: 'nazwa',
+  releaseDate: 'data wydania',
 }
 
 const fmt = new Intl.DateTimeFormat('pl-PL', {

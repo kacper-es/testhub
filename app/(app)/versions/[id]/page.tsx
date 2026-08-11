@@ -25,8 +25,8 @@ import {
   type AttachOption,
 } from '@/components/versions/AttachInstance'
 import { CommentForm } from '@/components/versions/CommentForm'
+import Link from 'next/link'
 import { AppIcon } from '@/components/versions/AppIcon'
-import { setVersionApplication } from '@/app/actions/versions'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
 
@@ -197,20 +197,11 @@ export default async function VersionDetailPage({
     }))
     .sort((a, b) => a.resolved.sortOrder - b.resolved.sortOrder)
 
-  // Aplikacje do selektora zmiany — tylko na otwartej wersji z prawem edycji.
-  const activeApps = disabled
-    ? []
-    : await prisma.application.findMany({
-        where: { isActive: true },
-        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-        select: { id: true, name: true },
-      })
-
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       {/* Polling 5 s — odświeża Server Components (sekcja 7). */}
       {!closed && <LivePolling />}
-      <div>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="flex items-center gap-2 font-mono text-2xl font-semibold">
             <AppIcon app={version.application} />
@@ -222,39 +213,10 @@ export default async function VersionDetailPage({
           </span>
         </div>
 
-        {!disabled && (activeApps.length > 0 || version.applicationId) && (
-          <form
-            action={setVersionApplication}
-            className="mt-3 flex flex-wrap items-center gap-2"
-          >
-            <input type="hidden" name="versionId" value={version.id} />
-            <label className="text-sm text-muted" htmlFor="applicationId">
-              Aplikacja:
-            </label>
-            <select
-              id="applicationId"
-              name="applicationId"
-              defaultValue={version.applicationId ?? ''}
-              className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
-            >
-              <option value="">— brak —</option>
-              {activeApps.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
-                </option>
-              ))}
-              {/* Bieżąca aplikacja nieaktywna — pokaż, by nie znikła z selecta. */}
-              {version.application &&
-                !activeApps.some((a) => a.id === version.application?.id) && (
-                  <option value={version.application.id}>
-                    {version.application.name} (nieaktywna)
-                  </option>
-                )}
-            </select>
-            <Button type="submit" variant="secondary">
-              Zapisz
-            </Button>
-          </form>
+        {!disabled && (
+          <Link href={`/versions/${version.id}/edit`}>
+            <Button variant="secondary">Edytuj wersję</Button>
+          </Link>
         )}
       </div>
 

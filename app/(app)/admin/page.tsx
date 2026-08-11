@@ -17,6 +17,11 @@ export default async function AdminPage() {
       desc: 'Aplikacje, do których przypisujesz wersje. Dodawanie ikon (upload z urządzenia), dezaktywacja.',
     },
     {
+      href: '/admin/instances',
+      title: 'Katalog instancji',
+      desc: 'Środowiska/instancje przypisywane do wersji. Konfigurowane na starcie, dodawanie, edycja, dezaktywacja, import z CSV.',
+    },
+    {
       href: '/admin/users',
       title: 'Konta',
       desc: 'Tworzenie kont z hasłem tymczasowym, reset hasła, rola, dezaktywacja.',

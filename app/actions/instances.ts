@@ -8,14 +8,15 @@ import { instanceSchema } from '@/lib/validation/instance'
 
 export type InstanceFormState = { error?: string }
 
-// Edycja katalogu instancji: TESTER/ADMIN (sekcja 5). Zero delete — dezaktywacja
-// przez isActive (reguła integralności). Nowa/edytowana instancja nie dopina się
-// sama do trwających wersji (reguła 20 — to robi „Podepnij instancję" w widoku wersji).
+// Katalog instancji to konfiguracja administracyjna (ADMIN) — ustawiana na starcie,
+// edytowana rzadko. Zero delete — dezaktywacja przez isActive (reguła integralności).
+// Nowa/edytowana instancja nie dopina się sama do trwających wersji (reguła 20 — to
+// robi „Podepnij instancję" w widoku wersji).
 export async function createInstance(
   _prev: InstanceFormState,
   formData: FormData,
 ): Promise<InstanceFormState> {
-  await requireRole(['TESTER', 'ADMIN'])
+  await requireRole(['ADMIN'])
   const parsed = instanceSchema.safeParse({
     name: formData.get('name'),
     clientName: formData.get('clientName'),
@@ -26,14 +27,14 @@ export async function createInstance(
   }
 
   await prisma.instance.create({ data: parsed.data })
-  redirect('/instances')
+  redirect('/admin/instances')
 }
 
 export async function updateInstance(
   _prev: InstanceFormState,
   formData: FormData,
 ): Promise<InstanceFormState> {
-  await requireRole(['TESTER', 'ADMIN'])
+  await requireRole(['ADMIN'])
   const id = String(formData.get('id') ?? '')
   if (!id) return { error: 'Brak identyfikatora instancji' }
 
@@ -47,16 +48,16 @@ export async function updateInstance(
   }
 
   await prisma.instance.update({ where: { id }, data: parsed.data })
-  redirect('/instances')
+  redirect('/admin/instances')
 }
 
 // Dezaktywacja / reaktywacja — nigdy delete (reguła integralności).
 export async function setInstanceActive(formData: FormData): Promise<void> {
-  await requireRole(['TESTER', 'ADMIN'])
+  await requireRole(['ADMIN'])
   const id = String(formData.get('id') ?? '')
   const active = formData.get('active') === 'true'
   if (!id) throw new Error('Brak identyfikatora instancji')
 
   await prisma.instance.update({ where: { id }, data: { isActive: active } })
-  revalidatePath('/instances')
+  revalidatePath('/admin/instances')
 }

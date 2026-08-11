@@ -804,6 +804,95 @@ każdej zalogowanej stronie.
 
 ---
 
+## Krok UI-3 — Katalog instancji w panelu admina `[x]`
+
+Instancje to konfiguracja ustawiana na starcie i edytowana rzadko (raz w roku) —
+przeniesione z głównej nawigacji do panelu admina, jak Szablony/Aplikacje/Konta.
+
+- [x] Trasy przeniesione: `/instances*` → `/admin/instances`, `/admin/instances/new`,
+  `/admin/instances/[id]/edit`
+- [x] Autoryzacja zaostrzona do **ADMIN** (było TESTER+ADMIN i publiczny podgląd):
+  strony `requireRolePage(['ADMIN'])`, akcje `requireRole(['ADMIN'])`
+- [x] Stary `/instances` usunięty (404); pozycja „Instancje" znika z głównej nawigacji
+- [x] Kafelek „Katalog instancji" w hubie `/admin`
+
+### Decyzje
+- **Wybór użytkownika (AskUserQuestion):** dostęp = **tylko ADMIN**; stary URL
+  `/instances` = **usunąć zupełnie** (404, bez redirectu — wewnętrzna apka).
+- **Zmiana polityki względem Kroku 8:** katalog przestaje być widoczny dla wszystkich
+  i edytowalny przez testerów. Instancje pozostają widoczne dla wszystkich **w kontekście
+  wersji** (tabela test-runów) — znika tylko samodzielny katalog dla nie-adminów. Egzekwowane
+  tym samym `requireRolePage`/`requireRole` co reszta admina (bez nowego testu).
+- **Breadcrumb działa bez zmian** — `SEGMENT_LABELS.instances='Katalog instancji'` daje
+  `Dashboard / Panel administratora / Katalog instancji` pod nową ścieżką.
+- **Lista uproszczona** — bez `canEdit` (admin zawsze edytuje); kontrolki zawsze widoczne.
+- Bez zmian `schema.prisma`, bez nowych zależności. `scripts/import-instances.ts` (CSV)
+  bez zmian — operuje na bazie, nie na trasie.
+
+### Jak sprawdzić
+- Główna nawigacja: brak „Instancje"; `/admin` → kafelek „Katalog instancji"
+- `/admin/instances` (ADMIN): lista + „Nowa instancja” → `/admin/instances/new`, edycja, dezaktywacja
+- Stary `/instances` → 404; nie-ADMIN na `/admin/instances*` → redirect `/`
+
+**Zweryfikowane w tej sesji (przeglądarka + docker):**
+- `npm run check` czysto (po wyczyszczeniu stale `.next/types`), `npx vitest run` → **33/33**.
+- `docker compose up -d --build` startuje (health 200).
+- `/admin/instances` (admin): h1 „Katalog instancji", breadcrumb `Dashboard / Panel
+  administratora / Katalog instancji", `activeNav=["Admin"]`, przycisk → `/admin/instances/new`.
+- Główna nawigacja = `[Dashboard, Wersje, Archiwum, Admin]` (bez „Instancje").
+- `/admin` hub: 5 kafelków, w tym „Katalog instancji" → `/admin/instances`.
+- Stary `/instances` (zalogowany) → **404**.
+
+---
+
+## Krok UI-4 — Osobny ekran edycji wersji `[x]`
+
+Wybór aplikacji przeniesiony z widoku wersji do dedykowanego ekranu edycji;
+doszła edycja daty wydania (terminy się przesuwają) i nazwy. Widok wersji
+pokazuje już tylko logo aplikacji (bez inline-selecta).
+
+- [x] Widok `/versions/[id]`: usunięty inline `<select>` aplikacji + akcja
+  `setVersionApplication`; zostaje samo `AppIcon`; przycisk „Edytuj wersję”
+  (tylko otwarta wersja + TESTER/ADMIN)
+- [x] Nowy ekran `/versions/[id]/edit` (nazwa, data wydania, aplikacja) —
+  `requireRolePage(['TESTER','ADMIN'])`, redirect na widok gdy wersja zamknięta
+- [x] Akcja `updateVersion` (zastępuje `setVersionApplication`): jedna transakcja,
+  `assertVersionEditable`, walidacja `zod`, P2002 → „Wersja X już istnieje”
+- [x] Zmiany nazwy / daty / aplikacji logowane do ChangeLog (stara→nowa)
+- [x] Etykiety PL w `/admin/changelog`: `nazwa`, `data wydania`
+
+### Decyzje
+- **Wybór użytkownika (AskUserQuestion):** ekran edytuje **nazwę + datę + aplikację**;
+  zmiana daty **logowana** do ChangeLog. Dla spójności audytu **nazwa też jest
+  logowana** (to identyfikator wersji — zmiana bez śladu byłaby luką).
+- **Tylko zmienione pola idą do ChangeLog** — akcja porównuje wartości i zapisuje
+  wyłącznie różnice (brak pustych wpisów przy zapisie bez zmian).
+- **`setVersionApplication` skonsolidowane w `updateVersion`** — jedna akcja i jeden
+  formularz zamiast osobnej mutacji per pole (było używane tylko w usuniętym inline-formularzu).
+- **Read-only na zamkniętej wersji** (reguła 12): strona edycji przekierowuje na widok,
+  a `assertVersionEditable` w akcji odrzuca mutację po stronie serwera.
+- **Aplikacja nieaktywna przypisana do wersji** — dołączana do selecta jako
+  „(nieaktywna)”, żeby nie zniknęła; zmiana na inną wymaga aplikacji aktywnej.
+- **Data w przeszłości** — nadal tylko ostrzeżenie (bez blokady), porównanie stringów
+  z `today` liczonym serwerowo (bez `new Date()` w kliencie, reguła 25).
+- Bez zmian `schema.prisma`, bez nowych zależności, tylko tokeny CSS, teksty PL.
+
+### Jak sprawdzić
+- Widok wersji (otwartej): samo logo przy nazwie, przycisk „Edytuj wersję”; PM go nie widzi
+- Ekran edycji: zmiana daty/aplikacji/nazwy → powrót na widok z nowymi wartościami
+- `/admin/changelog` (filtr Wersja): wpisy `data wydania` / `aplikacja` / `nazwa` (stara → nowa)
+- Nadanie istniejącej nazwy → „Wersja X już istnieje”; wersja zamknięta → brak edycji
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + docker, fixture przywrócony):**
+- `npm run check` czysto, `npx vitest run` → **33/33**, `docker compose up -d --build` (health 200).
+- Widok `9.9.9`: brak inline-selecta, przycisk „Edytuj wersję” → `/versions/[id]/edit`.
+- Edycja: data `2026-09-01 → 2026-09-15` + aplikacja `— → MerchMobiler` → redirect na widok,
+  nowa data i ikona widoczne; ChangeLog: **`data wydania` i `aplikacja`** (etykiety PL, stara→nowa).
+- Duplikat nazwy (`04.01.150 → 9.9.9`) → **„Wersja 9.9.9 już istnieje”**, bez zapisu.
+- Fixture `9.9.9` przywrócony (data 2026-09-01, bez aplikacji).
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`
