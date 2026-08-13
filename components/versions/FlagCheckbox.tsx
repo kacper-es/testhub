@@ -2,24 +2,24 @@
 
 import { useOptimistic, useTransition } from 'react'
 import { Checkbox } from '@/components/ui/Checkbox'
-import type { ActionResult } from '@/app/actions/test-runs'
+import { setColumnValue } from '@/app/actions/test-runs'
 
-// Pojedyncza flaga InstanceTestRun. Optymistyczny stan + akcja per-pole (reguła 21).
-// Tooltip pokazuje ostatnią zmianę tej flagi z ChangeLog (sekcja 8.3).
+// Pojedynczy krok (kolumna) dla jednego runu instancji. Optymistyczny stan + zapis
+// per-pole (reguła 21). Tooltip pokazuje ostatnią zmianę tego kroku z ChangeLog.
 export function FlagCheckbox({
   runId,
+  versionColumnId,
   checked,
   label,
   tooltip,
   disabled = false,
-  action,
 }: {
   runId: string
+  versionColumnId: string
   checked: boolean
   label: string
   tooltip?: string
   disabled?: boolean
-  action: (runId: string, value: boolean) => Promise<ActionResult>
 }) {
   const [optimistic, setOptimistic] = useOptimistic(checked)
   const [, startTransition] = useTransition()
@@ -27,7 +27,7 @@ export function FlagCheckbox({
   function toggle(value: boolean) {
     startTransition(async () => {
       setOptimistic(value)
-      await action(runId, value)
+      await setColumnValue(runId, versionColumnId, value)
     })
   }
 

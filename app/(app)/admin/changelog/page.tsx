@@ -92,6 +92,24 @@ export default async function ChangelogPage({
   ])
 
   const versionName = new Map(versions.map((v) => [v.id, v.name]))
+
+  // Nowe wpisy zmian kroków instancji kluczują pole po id kroku wersji — rozwiąż
+  // je na nazwę. Stare wpisy (flagi) mają nazwę pola w FIELD_LABEL i tu nie wpadają.
+  const columnFieldIds = entries
+    .filter((e) => e.entityType === 'InstanceTestRun' && !(e.field in FIELD_LABEL))
+    .map((e) => e.field)
+  const columnName = new Map<string, string>()
+  if (columnFieldIds.length > 0) {
+    const cols = await prisma.versionColumn.findMany({
+      where: { id: { in: columnFieldIds } },
+      select: { id: true, name: true },
+    })
+    for (const c of cols) columnName.set(c.id, c.name)
+  }
+
+  const fieldLabel = (field: string): string =>
+    FIELD_LABEL[field] ?? columnName.get(field) ?? field
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   // Zbuduj querystring dla paginacji, zachowując aktywne filtry.
@@ -216,7 +234,7 @@ export default async function ChangelogPage({
                     {e.versionId ? (versionName.get(e.versionId) ?? '—') : '—'}
                   </td>
                   <td className="px-3 py-2">
-                    {FIELD_LABEL[e.field] ?? e.field}
+                    {fieldLabel(e.field)}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">
                     {displayValue(e.oldValue)} → {displayValue(e.newValue)}

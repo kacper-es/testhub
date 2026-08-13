@@ -9,18 +9,13 @@ import { notesSchema } from '@/lib/validation/test-run'
 
 export type ActionResult = { error?: string }
 
-type FlagField =
-  | 'environmentRestored'
-  | 'dbScriptsInstalled'
-  | 'backendUpdated'
-  | 'testsCompleted'
-
-// Wspólna logika dla 4 flag. Każda flaga to osobna akcja (reguła 21) aktualizująca
-// dokładnie jedną kolumnę — dwie osoby klikające różne flagi w tym samym wierszu
-// nie nadpisują się. Log w tej samej transakcji (reguła 28).
-async function setFlag(
+// Zaznaczenie jednego kroku (kolumny) dla jednego runu. Każdy krok to osobny
+// wiersz InstanceRunValue (reguła 21) — dwie osoby klikające różne kroki w tym
+// samym wierszu nie nadpisują się. Wartość tworzona leniwie (brak wiersza = false).
+// Log w tej samej transakcji (reguła 28), kluczowany po id kroku wersji.
+export async function setColumnValue(
   runId: string,
-  field: FlagField,
+  versionColumnId: string,
   value: boolean,
 ): Promise<ActionResult> {
   const user = await requireRole(['TESTER', 'ADMIN'])
@@ -31,7 +26,29 @@ async function setFlag(
   if (!run) return { error: 'Nie znaleziono instancji w wersji' }
   assertVersionEditable(run.version.status)
 
-  const oldValue = run[field]
+  const column = await prisma.versionColumn.findUnique({
+    where: { id: versionColumnId },
+    select: { versionId: true, excludedAt: true, fieldType: true },
+  })
+  if (
+    !column ||
+    column.versionId !== run.versionId ||
+    column.excludedAt !== null
+  ) {
+    return { error: 'Nie znaleziono kroku w tej wersji' }
+  }
+  if (column.fieldType !== 'CHECKBOX') {
+    return { error: 'Nieobsługiwany typ kroku' }
+  }
+
+  const where = {
+    testRunId_versionColumnId: { testRunId: runId, versionColumnId },
+  }
+  const existing = await prisma.instanceRunValue.findUnique({
+    where,
+    select: { boolValue: true },
+  })
+  const oldValue = existing?.boolValue ?? false
   if (oldValue === value) return {}
 
   await prisma.$transaction(async (tx) => {
@@ -39,47 +56,25 @@ async function setFlag(
       entityType: 'InstanceTestRun',
       entityId: run.id,
       versionId: run.versionId,
-      field,
+      field: versionColumnId,
       oldValue: String(oldValue),
       newValue: String(value),
       userId: user.id,
     })
-    await tx.instanceTestRun.update({
-      where: { id: run.id },
-      data: { [field]: value, updatedById: user.id },
+    await tx.instanceRunValue.upsert({
+      where,
+      create: {
+        testRunId: runId,
+        versionColumnId,
+        boolValue: value,
+        updatedById: user.id,
+      },
+      update: { boolValue: value, updatedById: user.id },
     })
   })
 
   revalidatePath(`/versions/${run.versionId}`)
   return {}
-}
-
-export async function setEnvironmentRestored(
-  runId: string,
-  value: boolean,
-): Promise<ActionResult> {
-  return setFlag(runId, 'environmentRestored', value)
-}
-
-export async function setDbScriptsInstalled(
-  runId: string,
-  value: boolean,
-): Promise<ActionResult> {
-  return setFlag(runId, 'dbScriptsInstalled', value)
-}
-
-export async function setBackendUpdated(
-  runId: string,
-  value: boolean,
-): Promise<ActionResult> {
-  return setFlag(runId, 'backendUpdated', value)
-}
-
-export async function setTestsCompleted(
-  runId: string,
-  value: boolean,
-): Promise<ActionResult> {
-  return setFlag(runId, 'testsCompleted', value)
 }
 
 // Notatki — zapis z debounce po stronie klienta; tu walidacja + log (reguła 27).

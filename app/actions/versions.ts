@@ -30,11 +30,12 @@ export async function createVersion(
     name: formData.get('name'),
     releaseDate: formData.get('releaseDate'),
     applicationId: formData.get('applicationId') ?? '',
+    columnTemplateId: formData.get('columnTemplateId') ?? '',
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane' }
   }
-  const { name, releaseDate, applicationId } = parsed.data
+  const { name, releaseDate, applicationId, columnTemplateId } = parsed.data
 
   // Aplikacja opcjonalna — jeśli podana, musi istnieć i być aktywna.
   if (applicationId) {
@@ -51,6 +52,16 @@ export async function createVersion(
     prisma.taskTemplate.findMany({ where: { isActive: true }, select: { id: true } }),
     prisma.instance.findMany({ where: { isActive: true }, select: { id: true } }),
   ])
+
+  // Kroki podpinane z wybranego szablonu (flow) — kopia przy podpięciu, tylko
+  // aktywne kroki katalogu. Kolejność wg pozycji w szablonie.
+  const flowColumns = columnTemplateId
+    ? await prisma.columnTemplateItem.findMany({
+        where: { templateId: columnTemplateId, column: { isActive: true } },
+        include: { column: { select: { id: true, name: true, fieldType: true } } },
+        orderBy: { sortOrder: 'asc' },
+      })
+    : []
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -75,6 +86,17 @@ export async function createVersion(
           data: instances.map((i) => ({
             versionId: version.id,
             instanceId: i.id,
+          })),
+        })
+      }
+      if (flowColumns.length > 0) {
+        await tx.versionColumn.createMany({
+          data: flowColumns.map((it, i) => ({
+            versionId: version.id,
+            columnId: it.column.id,
+            name: it.column.name,
+            fieldType: it.column.fieldType,
+            sortOrder: (i + 1) * 10,
           })),
         })
       }

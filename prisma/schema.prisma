@@ -63,9 +63,10 @@ model User {
   createdVersions       Version[]         @relation("CreatedVersions")
   statusChangedVersions Version[]         @relation("StatusChangedVersions")
   completedTasks        VersionTask[]     @relation("CompletedTasks")
-  updatedTestRuns       InstanceTestRun[] @relation("UpdatedTestRuns")
-  comments              VersionComment[]  @relation("Comments")
-  changeLogs            ChangeLog[]       @relation("ChangeLogs")
+  updatedTestRuns       InstanceTestRun[]  @relation("UpdatedTestRuns")
+  updatedRunValues      InstanceRunValue[] @relation("UpdatedRunValues")
+  comments              VersionComment[]   @relation("Comments")
+  changeLogs            ChangeLog[]        @relation("ChangeLogs")
 }
 
 model Session {
@@ -98,6 +99,7 @@ model Version {
   tasks    VersionTask[]
   testRuns InstanceTestRun[]
   comments VersionComment[]
+  columns  VersionColumn[]
 
   @@index([status, releaseDate])
   @@index([applicationId])
@@ -176,19 +178,15 @@ model InstanceTestRun {
   versionId  String
   instanceId String
 
-  environmentRestored Boolean @default(false)
-  dbScriptsInstalled  Boolean @default(false)
-  backendUpdated      Boolean @default(false)
-  testsCompleted      Boolean @default(false)
-
   notes       String?
   excludedAt  DateTime?
   updatedAt   DateTime  @updatedAt
   updatedById String?
 
-  version   Version  @relation(fields: [versionId], references: [id], onDelete: Cascade)
-  instance  Instance @relation(fields: [instanceId], references: [id], onDelete: Restrict)
-  updatedBy User?    @relation("UpdatedTestRuns", fields: [updatedById], references: [id], onDelete: Restrict)
+  version   Version            @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  instance  Instance           @relation(fields: [instanceId], references: [id], onDelete: Restrict)
+  updatedBy User?              @relation("UpdatedTestRuns", fields: [updatedById], references: [id], onDelete: Restrict)
+  values    InstanceRunValue[]
 
   @@unique([versionId, instanceId])
   @@index([versionId, excludedAt])
@@ -205,7 +203,8 @@ model Column {
   sortOrder Int
   createdAt DateTime        @default(now())
 
-  templateItems ColumnTemplateItem[]
+  templateItems  ColumnTemplateItem[]
+  versionColumns VersionColumn[]
 }
 
 // Szablon („flow") — nazwany zestaw kroków. Jeden może być domyślny (isDefault):
@@ -231,6 +230,44 @@ model ColumnTemplateItem {
   column   Column         @relation(fields: [columnId], references: [id], onDelete: Restrict)
 
   @@unique([templateId, columnId])
+}
+
+// Zestaw kroków danej wersji — KOPIA przy podpięciu (name/fieldType kopiowane),
+// więc rename/dezaktywacja w katalogu nie rusza istniejącej wersji. Usunięcie
+// kroku z wersji = excludedAt (soft-hide, reguła 18) — wartości zostają.
+model VersionColumn {
+  id         String          @id @default(cuid())
+  versionId  String
+  columnId   String? // proweniencja (null = ad-hoc lub backfill historyczny)
+  name       String
+  fieldType  ColumnFieldType
+  sortOrder  Int
+  excludedAt DateTime?
+  createdAt  DateTime        @default(now())
+
+  version Version            @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  column  Column?            @relation(fields: [columnId], references: [id], onDelete: Restrict)
+  values  InstanceRunValue[]
+
+  @@index([versionId, excludedAt])
+}
+
+// Wartość jednego kroku dla jednego runu instancji. Wiersz na parę run×kolumna —
+// zapis jednego pola niezależny od innych (reguła 21, brak wzajemnego nadpisywania).
+// Brak wiersza = false (wartości tworzone leniwie przy pierwszym zaznaczeniu).
+model InstanceRunValue {
+  id              String   @id @default(cuid())
+  testRunId       String
+  versionColumnId String
+  boolValue       Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+
+  testRun       InstanceTestRun @relation(fields: [testRunId], references: [id], onDelete: Cascade)
+  versionColumn VersionColumn   @relation(fields: [versionColumnId], references: [id], onDelete: Cascade)
+  updatedBy     User?           @relation("UpdatedRunValues", fields: [updatedById], references: [id], onDelete: Restrict)
+
+  @@unique([testRunId, versionColumnId])
 }
 
 model VersionComment {

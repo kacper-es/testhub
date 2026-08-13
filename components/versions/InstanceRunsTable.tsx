@@ -1,88 +1,28 @@
 import type { Instance, InstanceTestRun } from '@prisma/client'
-import {
-  setBackendUpdated,
-  setDbScriptsInstalled,
-  setEnvironmentRestored,
-  setTestsCompleted,
-  unpinInstanceRun,
-  type ActionResult,
-} from '@/app/actions/test-runs'
+import { unpinInstanceRun } from '@/app/actions/test-runs'
 import { FlagCheckbox } from '@/components/versions/FlagCheckbox'
 import { NotesField } from '@/components/versions/NotesField'
 import { Button } from '@/components/ui/Button'
-import { cn } from '@/lib/cn'
 
 type Run = InstanceTestRun & { instance: Instance }
 
-// Ostatnia zmiana danej flagi, mapowana kluczem `${runId}:${field}` (z ChangeLog).
+// Aktywne kroki (kolumny) wersji — kopie z VersionColumn.
+export type RunColumn = { id: string; name: string }
+
+// Wartość kroku dla runu, klucz `${runId}:${versionColumnId}` (brak = false).
+export type ValueMap = Map<string, boolean>
+
+// Ostatnia zmiana kroku, klucz `${runId}:${versionColumnId}` (z ChangeLog).
 export type LastChangeMap = Map<string, { user: string; when: string }>
 
-const FLAGS = [
-  {
-    field: 'environmentRestored',
-    header: 'Środowisko',
-    tip: 'środowisko odtworzone',
-    action: setEnvironmentRestored,
-  },
-  {
-    field: 'dbScriptsInstalled',
-    header: 'Skrypty DB',
-    tip: 'skrypty bazodanowe',
-    action: setDbScriptsInstalled,
-  },
-  {
-    field: 'backendUpdated',
-    header: 'Backend',
-    tip: 'backend podbity',
-    action: setBackendUpdated,
-  },
-  {
-    field: 'testsCompleted',
-    header: 'Testy',
-    tip: 'testy wykonane',
-    action: setTestsCompleted,
-  },
-] as const satisfies ReadonlyArray<{
-  field: keyof Run
-  header: string
-  tip: string
-  action: (runId: string, value: boolean) => Promise<ActionResult>
-}>
-
 function tooltip(
-  run: Run,
-  field: string,
-  tip: string,
+  runId: string,
+  columnId: string,
+  base: string,
   lastChanges: LastChangeMap,
 ): string {
-  const last = lastChanges.get(`${run.id}:${field}`)
-  return last ? `${tip}: ${last.user}, ${last.when}` : tip
-}
-
-function Flags({
-  run,
-  disabled,
-  lastChanges,
-}: {
-  run: Run
-  disabled: boolean
-  lastChanges: LastChangeMap
-}) {
-  return (
-    <>
-      {FLAGS.map((f) => (
-        <FlagCheckbox
-          key={f.field}
-          runId={run.id}
-          checked={run[f.field] as boolean}
-          label={f.header}
-          tooltip={tooltip(run, f.field, f.tip, lastChanges)}
-          disabled={disabled}
-          action={f.action}
-        />
-      ))}
-    </>
-  )
+  const last = lastChanges.get(`${runId}:${columnId}`)
+  return last ? `${base}: ${last.user}, ${last.when}` : base
 }
 
 function UnpinButton({ runId }: { runId: string }) {
@@ -109,10 +49,14 @@ function InstanceName({ instance }: { instance: Instance }) {
 
 export function InstanceRunsTable({
   runs,
+  columns,
+  values,
   disabled,
   lastChanges,
 }: {
   runs: Run[]
+  columns: RunColumn[]
+  values: ValueMap
   disabled: boolean
   lastChanges: LastChangeMap
 }) {
@@ -124,59 +68,70 @@ export function InstanceRunsTable({
     )
   }
 
+  const isChecked = (runId: string, columnId: string) =>
+    values.get(`${runId}:${columnId}`) ?? false
+
   return (
-    <div>
-      {/* Desktop: tabela */}
-      <table className="hidden w-full border-collapse text-sm md:table">
-        <thead>
-          <tr className="border-b border-border text-left">
-            <th className="px-3 py-2 font-semibold text-muted">Instancja</th>
-            {FLAGS.map((f) => (
-              <th
-                key={f.field}
-                className="px-2 py-2 text-center font-semibold text-muted"
-              >
-                {f.header}
-              </th>
-            ))}
-            <th className="px-3 py-2 font-semibold text-muted">Notatki</th>
-            {!disabled && <th className="px-3 py-2" />}
-          </tr>
-        </thead>
-        <tbody>
-          {runs.map((run) => (
-            <tr key={run.id} className="border-b border-border align-top">
-              <td className="px-3 py-2">
-                <InstanceName instance={run.instance} />
-              </td>
-              {FLAGS.map((f) => (
-                <td key={f.field} className="px-2 py-2 text-center">
-                  <FlagCheckbox
+    <div className="flex flex-col gap-3">
+      {columns.length === 0 && (
+        <p className="text-sm text-muted">
+          Ta wersja nie ma kroków — dodaj je w edycji wersji.
+        </p>
+      )}
+
+      {/* Desktop: tabela (przewija się w swoim kontenerze przy wielu krokach) */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border text-left">
+              <th className="px-3 py-2 font-semibold text-muted">Instancja</th>
+              {columns.map((c) => (
+                <th
+                  key={c.id}
+                  className="px-2 py-2 text-center font-semibold text-muted"
+                >
+                  {c.name}
+                </th>
+              ))}
+              <th className="px-3 py-2 font-semibold text-muted">Notatki</th>
+              {!disabled && <th className="px-3 py-2" />}
+            </tr>
+          </thead>
+          <tbody>
+            {runs.map((run) => (
+              <tr key={run.id} className="border-b border-border align-top">
+                <td className="px-3 py-2">
+                  <InstanceName instance={run.instance} />
+                </td>
+                {columns.map((c) => (
+                  <td key={c.id} className="px-2 py-2 text-center">
+                    <FlagCheckbox
+                      runId={run.id}
+                      versionColumnId={c.id}
+                      checked={isChecked(run.id, c.id)}
+                      label={c.name}
+                      tooltip={tooltip(run.id, c.id, c.name, lastChanges)}
+                      disabled={disabled}
+                    />
+                  </td>
+                ))}
+                <td className="px-3 py-2">
+                  <NotesField
                     runId={run.id}
-                    checked={run[f.field] as boolean}
-                    label={f.header}
-                    tooltip={tooltip(run, f.field, f.tip, lastChanges)}
+                    notes={run.notes}
                     disabled={disabled}
-                    action={f.action}
                   />
                 </td>
-              ))}
-              <td className="px-3 py-2">
-                <NotesField
-                  runId={run.id}
-                  notes={run.notes}
-                  disabled={disabled}
-                />
-              </td>
-              {!disabled && (
-                <td className="px-3 py-2 text-right">
-                  <UnpinButton runId={run.id} />
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                {!disabled && (
+                  <td className="px-3 py-2 text-right">
+                    <UnpinButton runId={run.id} />
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {/* Mobile: karty (sekcja 9.4 — bez poziomego scrolla) */}
       <div className="flex flex-col gap-3 md:hidden">
@@ -189,24 +144,26 @@ export function InstanceRunsTable({
               <InstanceName instance={run.instance} />
               {!disabled && <UnpinButton runId={run.id} />}
             </div>
-            <div className="flex flex-col gap-2">
-              {FLAGS.map((f) => (
-                <div
-                  key={f.field}
-                  className={cn('flex items-center justify-between gap-3')}
-                >
-                  <span className="text-sm text-muted">{f.header}</span>
-                  <FlagCheckbox
-                    runId={run.id}
-                    checked={run[f.field] as boolean}
-                    label={f.header}
-                    tooltip={tooltip(run, f.field, f.tip, lastChanges)}
-                    disabled={disabled}
-                    action={f.action}
-                  />
-                </div>
-              ))}
-            </div>
+            {columns.length > 0 && (
+              <div className="flex flex-col gap-2">
+                {columns.map((c) => (
+                  <div
+                    key={c.id}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span className="text-sm text-muted">{c.name}</span>
+                    <FlagCheckbox
+                      runId={run.id}
+                      versionColumnId={c.id}
+                      checked={isChecked(run.id, c.id)}
+                      label={c.name}
+                      tooltip={tooltip(run.id, c.id, c.name, lastChanges)}
+                      disabled={disabled}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
             <NotesField runId={run.id} notes={run.notes} disabled={disabled} />
           </div>
         ))}

@@ -28,10 +28,10 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 |---|---|
 | 📋 **Dashboard** | Wersje w przygotowaniu z odliczaniem do wydania, postępem i gotowością instancji |
 | ✅ **Checklista wersji** | Trzy typy zadań (checkbox, licznik zgłoszeń, agregat instancji) z deadline'ami i progami pilności |
-| 🖥️ **Instancje testowe** | Tabela środowisk z 4 flagami gotowości, notatkami i podpinaniem/odpinaniem |
-| ✏️ **Edycja wersji** | Osobny ekran: zmiana nazwy, daty wydania i aplikacji (terminy się przesuwają) |
+| 🖥️ **Instancje testowe** | Tabela środowisk z konfigurowalnymi krokami (kolumnami) gotowości, notatkami i podpinaniem/odpinaniem |
+| ✏️ **Edycja wersji** | Osobny ekran: zmiana nazwy, daty wydania, aplikacji i kroków wersji (terminy się przesuwają) |
 | 🗄️ **Archiwum** | Wersje wydane i anulowane z powodem i filtrami |
-| 🛠️ **Panel admina** | Szablony zadań, aplikacje (z ikonami), katalog instancji, konta, log zmian |
+| 🛠️ **Panel admina** | Szablony zadań, aplikacje (z ikonami), katalog instancji, kroki i szablony (flow), konta, log zmian |
 | 🌗 **Motywy** | Jasny / ciemny / systemowy, bez migotania, zapisywane per użytkownik |
 | 🔄 **Na żywo** | Polling co 5 s na dashboardzie i widoku wersji |
 | 🔐 **Bezpieczeństwo** | Autoryzacja per rola po stronie serwera, audyt zmian w `ChangeLog` |
@@ -77,7 +77,8 @@ npm run seed
 ```
 
 Idempotentny (`upsert`) — można uruchamiać wielokrotnie, nie tworzy duplikatów.
-Ładuje **4 użytkowników, 6 szablonów zadań, 5 instancji i 2 aplikacje**. Uruchamiany
+Ładuje **4 użytkowników, 6 szablonów zadań, 5 instancji, 2 aplikacje oraz 4 kroki
+i domyślny szablon (flow)**. Uruchamiany
 lokalnie przeciw `DATABASE_URL` z `.env` (baza w kontenerze na `localhost:5432`);
 **nie** jest częścią `docker compose up`.
 
@@ -113,6 +114,7 @@ W produkcji admin ustawia własne hasła — nie używaj tych wartości poza dev
 | `/admin/templates` | Szablony zadań (dodawanie, edycja, kolejność, dezaktywacja) |
 | `/admin/applications` | Aplikacje + ikony (upload z urządzenia) |
 | `/admin/instances` | Katalog instancji (CRUD, import z CSV) |
+| `/admin/columns` | Konfiguracja kroków (kolumn tabeli instancji) i szablonów (flow) |
 | `/admin/users` | Konta (tworzenie, reset hasła, rola, dezaktywacja) |
 | `/admin/changelog` | Log zmian z filtrami i paginacją |
 

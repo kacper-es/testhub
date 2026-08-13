@@ -121,7 +121,7 @@ export default async function VersionDetailPage({
     include: {
       tasks: { include: { taskTemplate: true } },
       testRuns: {
-        include: { instance: true },
+        include: { instance: true, values: true },
         orderBy: { instance: { name: 'asc' } },
       },
       comments: {
@@ -136,6 +136,10 @@ export default async function VersionDetailPage({
           iconUpdatedAt: true,
         },
       },
+      columns: {
+        where: { excludedAt: null },
+        orderBy: { sortOrder: 'asc' },
+      },
     },
   })
   if (!version) notFound()
@@ -145,8 +149,29 @@ export default async function VersionDetailPage({
   const disabled = !canEdit || closed
   const vs = VERSION_STATUS[version.status]
 
-  // Agregat instancji wspólny dla wszystkich zadań INSTANCE_AGGREGATE (reguła 16).
-  const instanceAgg = instanceAggregateStatus(version.testRuns)
+  // Aktywne kroki wersji i mapa wartości `${runId}:${versionColumnId}` → bool.
+  const activeColumns = version.columns
+  const checkboxColumnIds = new Set(
+    activeColumns.filter((c) => c.fieldType === 'CHECKBOX').map((c) => c.id),
+  )
+  const valueMap = new Map<string, boolean>()
+  for (const run of version.testRuns) {
+    for (const v of run.values) {
+      valueMap.set(`${run.id}:${v.versionColumnId}`, v.boolValue)
+    }
+  }
+
+  // Agregat instancji (reguła 16): licznik zaznaczonych kroków checkbox per run,
+  // mianownik = liczba aktywnych kroków checkbox wersji.
+  const instanceAgg = instanceAggregateStatus(
+    version.testRuns.map((run) => ({
+      excludedAt: run.excludedAt,
+      trueCount: run.values.filter(
+        (v) => checkboxColumnIds.has(v.versionColumnId) && v.boolValue,
+      ).length,
+    })),
+    checkboxColumnIds.size,
+  )
 
   // Ostatnie zmiany flag/notatek — jedno zapytanie DISTINCT ON (reguła 4).
   const lastRows = await prisma.$queryRaw<LastChangeRow[]>`
@@ -304,6 +329,8 @@ export default async function VersionDetailPage({
         <h2 className="text-lg font-semibold">Instancje</h2>
         <InstanceRunsTable
           runs={activeRuns}
+          columns={activeColumns.map((c) => ({ id: c.id, name: c.name }))}
+          values={valueMap}
           disabled={disabled}
           lastChanges={lastChanges}
         />

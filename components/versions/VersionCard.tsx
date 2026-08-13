@@ -21,7 +21,8 @@ import { cn } from '@/lib/cn'
 export type DashboardVersion = Prisma.VersionGetPayload<{
   include: {
     tasks: { include: { taskTemplate: true } }
-    testRuns: true
+    testRuns: { include: { values: true } }
+    columns: true
     application: {
       select: {
         id: true
@@ -53,7 +54,20 @@ export function VersionCard({
   version: DashboardVersion
   today: string
 }) {
-  const instanceAgg = instanceAggregateStatus(version.testRuns)
+  const checkboxColumnIds = new Set(
+    version.columns
+      .filter((c) => c.excludedAt === null && c.fieldType === 'CHECKBOX')
+      .map((c) => c.id),
+  )
+  const instanceAgg = instanceAggregateStatus(
+    version.testRuns.map((run) => ({
+      excludedAt: run.excludedAt,
+      trueCount: run.values.filter(
+        (v) => checkboxColumnIds.has(v.versionColumnId) && v.boolValue,
+      ).length,
+    })),
+    checkboxColumnIds.size,
+  )
 
   const tasks = version.tasks
     .map((task) => {

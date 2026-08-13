@@ -948,6 +948,55 @@ jeszcze 4 sztywnych flag ani logiki wersji. Cutover → Krok Kolumny-B.
 
 ---
 
+## Krok Kolumny-B — Cutover na kolumny wersji `[x]`
+
+Drugi krok konfigurowalnych kolumn („kroków"). Zastępuje 4 sztywne flagi
+`InstanceTestRun` dynamicznymi krokami per-wersja (kopie z szablonu/flow),
+z pełnym backfillem danych. Aplikacja czyta wartości wyłącznie przez nowe tabele.
+
+- [x] Schema: `VersionColumn` (kopia name/fieldType, `excludedAt` soft-hide) +
+  `InstanceRunValue` (wiersz na parę run×kolumna, reguła 21); usunięte 4 boolean z `InstanceTestRun`
+- [x] Migracja `column_cutover` (ręczna): utwórz tabele → **backfill** 4 flag do
+  `VersionColumn` + `InstanceRunValue` per wersja/run → drop 4 kolumn (atomowo, transakcyjny DDL)
+- [x] `aggregates.ts` przepisany na dynamiczny model (`trueCount` per run, N kroków checkbox) + testy
+- [x] `setColumnValue(runId, versionColumnId, value)` zastępuje 4 akcje flag (upsert wartości, log po kroku)
+- [x] `version-columns.ts`: `addVersionColumns` (z katalogu), `removeVersionColumn` (soft), `restoreVersionColumn`
+- [x] Dynamiczna `InstanceRunsTable` (kolumny z `VersionColumn`, `overflow-x-auto`); widok wersji + `VersionCard` liczą agregat z wartości
+- [x] Tworzenie wersji podpina domyślny/wybrany flow; ekran edycji wersji zarządza krokami
+- [x] Changelog rozwiązuje `versionColumnId` → nazwa kroku (stare etykiety flag zostają dla historii)
+
+### Decyzje
+- **Backfill z `columnId = NULL`** dla danych historycznych — kolumna samowystarczalna
+  (name/fieldType skopiowane), bez zależności migracji od zaseedowanego katalogu i bez
+  ryzyka FK. Dopasowanie flaga→krok po nazwie (literały w tej samej migracji).
+- **Wartości leniwie** — brak wiersza `InstanceRunValue` = false; tworzone przy pierwszym
+  zaznaczeniu (upsert). Mniej danych, agregat traktuje brak jako false.
+- **Gotowość** = run ma wszystkie aktywne kroki checkbox wersji = true; N = liczba tych
+  kroków. N = 0 → „brak kryteriów" (nic nie jest gotowe, bez pustej gotowości).
+- **Soft-remove + restore** kroku wersji (reguła 18): usunięcie chowa (`excludedAt`),
+  wartości zostają i wracają po „Przywróć" (ten sam wiersz). „Dodaj z katalogu" wyklucza
+  kroki aktywne i ukryte po nazwie (kroki backfillowane mają `columnId = null`).
+- **Log kluczowany po `versionColumnId`**; changelog mapuje id→nazwa (jak `versionId→nazwa`).
+  Stare wpisy flag (`environmentRestored` itd.) zachowują etykiety PL w `FIELD_LABEL`.
+
+### Jak sprawdzić
+- Widok wersji: kolumny = kroki wersji; zaznaczenie zapisuje się, changelog pokazuje nazwę kroku
+- Edycja wersji → „Kroki wersji": usuń krok (znika z tabeli), przywróć (wartości wracają), dodaj z katalogu
+- Nowa wersja z domyślnym flow → dostaje jego kroki; „— bez kroków —" → wersja bez kroków
+- Wersja bez kroków checkbox → „X/Y gotowych" nie pokazuje pustej gotowości
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + docker):**
+- `npm run check` czysto, `npx vitest run` → **34/34**, `docker compose up -d --build` (health 200).
+- **Migracja+backfill:** VersionColumn=8 (2 wersje × 4), InstanceRunValue=40 (10 runów × 4),
+  true=20, po 5 na każdy krok — dokładnie zgodne ze stanem 4 flag sprzed migracji.
+- Widok `9.9.9`: 4 dynamiczne kroki z zachowanymi wartościami; odznaczenie → baza `false`
+  + ChangeLog `Środowisko odtworzone: tak → nie` (nazwa, nie uuid).
+- Edycja: usuń „Testy wykonane" → 3 kroki w tabeli; „Przywróć" → 4 kroki, wartości **5/5 zachowane**.
+- Nowa wersja z „Domyślne flow" → **4 kroki** + 5 runów; wersja testowa i toggle posprzątane
+  (true_values=20, version_columns=8, versions=2).
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`

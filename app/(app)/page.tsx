@@ -32,7 +32,8 @@ export default async function DashboardPage({
       orderBy: { releaseDate: 'asc' },
       include: {
         tasks: { include: { taskTemplate: true } },
-        testRuns: true,
+        testRuns: { include: { values: true } },
+        columns: { where: { excludedAt: null } },
         application: { select: APP_SELECT },
       },
     }),

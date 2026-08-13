@@ -11,6 +11,12 @@ export const createVersionSchema = z.object({
     .trim()
     .transform((v) => (v === '' ? null : v))
     .nullable(),
+  // Szablon kroków („flow") podpinany przy tworzeniu. Puste = bez kroków.
+  columnTemplateId: z
+    .string()
+    .trim()
+    .transform((v) => (v === '' ? null : v))
+    .nullable(),
 })
 
 export const updateVersionSchema = z.object({

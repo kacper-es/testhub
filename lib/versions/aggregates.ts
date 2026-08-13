@@ -12,12 +12,11 @@ export function ticketAggregateStatus(current: number, total: number): TaskStatu
   return 'NOT_STARTED'
 }
 
-export type InstanceRunFlags = {
+// Gotowość jednego runu instancji: ile jego kroków checkbox jest zaznaczonych
+// (`trueCount`) spośród `checkboxColumnCount` aktywnych kroków checkbox wersji.
+export type InstanceRunReadiness = {
   excludedAt: Date | null
-  environmentRestored: boolean
-  dbScriptsInstalled: boolean
-  backendUpdated: boolean
-  testsCompleted: boolean
+  trueCount: number
 }
 
 export type InstanceAggregate = {
@@ -26,39 +25,25 @@ export type InstanceAggregate = {
   total: number
 }
 
-function allFlags(r: InstanceRunFlags): boolean {
-  return (
-    r.environmentRestored &&
-    r.dbScriptsInstalled &&
-    r.backendUpdated &&
-    r.testsCompleted
-  )
-}
-
-function anyFlag(r: InstanceRunFlags): boolean {
-  return (
-    r.environmentRestored ||
-    r.dbScriptsInstalled ||
-    r.backendUpdated ||
-    r.testsCompleted
-  )
-}
-
-// INSTANCE_AGGREGATE (reguła 16): mianownik = instancje z excludedAt = null;
-// licznik = te z wszystkimi 4 flagami true. DONE gdy licznik = mianownik i
-// mianownik > 0; IN_PROGRESS gdy licznik > 0 lub jakakolwiek flaga gdziekolwiek
-// true; inaczej NOT_STARTED. Odpięte instancje nie liczą się (reguła 19).
+// INSTANCE_AGGREGATE (reguła 16), wersja dynamiczna: mianownik = instancje z
+// excludedAt = null; licznik = te z wszystkimi aktywnymi krokami checkbox true.
+// DONE gdy licznik = mianownik i oba > 0; IN_PROGRESS gdy licznik > 0 lub gdzieś
+// jest zaznaczony krok; inaczej NOT_STARTED. Odpięte instancje nie liczą się
+// (reguła 19). Wersja bez kroków checkbox (checkboxColumnCount = 0) → „brak
+// kryteriów": nic nie jest gotowe (done = 0), nie ma pustej „gotowości".
 export function instanceAggregateStatus(
-  runs: InstanceRunFlags[],
+  runs: InstanceRunReadiness[],
+  checkboxColumnCount: number,
 ): InstanceAggregate {
   const active = runs.filter((r) => r.excludedAt === null)
   const total = active.length
-  const done = active.filter(allFlags).length
+  const n = checkboxColumnCount
+  const done = n > 0 ? active.filter((r) => r.trueCount >= n).length : 0
 
   let status: TaskStatus = 'NOT_STARTED'
-  if (total > 0 && done === total) {
+  if (n > 0 && total > 0 && done === total) {
     status = 'DONE'
-  } else if (done > 0 || active.some(anyFlag)) {
+  } else if (done > 0 || active.some((r) => r.trueCount > 0)) {
     status = 'IN_PROGRESS'
   }
 
