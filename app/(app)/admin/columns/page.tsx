@@ -2,11 +2,11 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { requireRolePage } from '@/lib/auth/authz'
 import {
-  setColumnActive,
   setColumnTemplateActive,
   setDefaultColumnTemplate,
 } from '@/app/actions/columns'
 import { FIELD_TYPE_LABEL } from '@/components/admin/ColumnForm'
+import { ColumnCatalogList } from '@/components/admin/ColumnCatalogList'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { StatusBadge } from '@/components/ui/StatusBadge'
@@ -66,12 +66,22 @@ export default async function ColumnsAdminPage({
 
 async function StepsTab() {
   const columns = await prisma.column.findMany({
-    orderBy: [{ isActive: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
   })
+  const toItem = (c: (typeof columns)[number]) => ({
+    id: c.id,
+    name: c.name,
+    typeLabel: FIELD_TYPE_LABEL[c.fieldType],
+  })
+  const active = columns.filter((c) => c.isActive).map(toItem)
+  const inactive = columns.filter((c) => !c.isActive).map(toItem)
 
   return (
     <section className="flex flex-col gap-4">
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted">
+          Przeciągnij <span aria-hidden>⠿</span>, by zmienić kolejność kroków.
+        </p>
         <Link href="/admin/columns/new">
           <Button variant="primary">Nowy krok</Button>
         </Link>
@@ -80,32 +90,7 @@ async function StepsTab() {
       {columns.length === 0 ? (
         <p className="text-muted">Brak kroków — dodaj pierwszy.</p>
       ) : (
-        <div className="flex flex-col gap-3">
-          {columns.map((c) => (
-            <Card key={c.id} className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="font-mono text-xs text-muted">{c.sortOrder}</span>
-                <span className="font-medium text-fg">{c.name}</span>
-                <span className="text-sm text-muted">{FIELD_TYPE_LABEL[c.fieldType]}</span>
-                {!c.isActive && <StatusBadge status="neutral">Nieaktywny</StatusBadge>}
-              </div>
-              <div className="flex items-center gap-2">
-                <Link href={`/admin/columns/${c.id}/edit`}>
-                  <Button variant="secondary" type="button">
-                    Edytuj
-                  </Button>
-                </Link>
-                <form action={setColumnActive}>
-                  <input type="hidden" name="id" value={c.id} />
-                  <input type="hidden" name="active" value={c.isActive ? 'false' : 'true'} />
-                  <Button variant={c.isActive ? 'ghost' : 'secondary'} type="submit">
-                    {c.isActive ? 'Dezaktywuj' : 'Aktywuj'}
-                  </Button>
-                </form>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <ColumnCatalogList active={active} inactive={inactive} />
       )}
     </section>
   )

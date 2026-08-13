@@ -14,7 +14,9 @@ export default async function EditColumnTemplatePage({
 
   const template = await prisma.columnTemplate.findUnique({
     where: { id },
-    include: { items: { select: { columnId: true } } },
+    include: {
+      items: { select: { columnId: true }, orderBy: { sortOrder: 'asc' } },
+    },
   })
   if (!template) notFound()
 

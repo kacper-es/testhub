@@ -5,11 +5,11 @@ import { todayInWarsaw } from '@/lib/date'
 import { toDateOnly } from '@/lib/versions/deadline'
 import {
   addVersionColumns,
-  removeVersionColumn,
   restoreVersionColumn,
 } from '@/app/actions/version-columns'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { VersionColumnsList } from '@/components/versions/VersionColumnsList'
 import { EditVersionForm } from './edit-version-form'
 
 export default async function EditVersionPage({
@@ -105,25 +105,10 @@ export default async function EditVersionPage({
           </p>
         </div>
 
-        {versionColumns.length === 0 ? (
-          <p className="text-sm text-muted">Ta wersja nie ma kroków.</p>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {versionColumns.map((c) => (
-              <li key={c.id}>
-                <Card className="flex items-center justify-between gap-3 py-2">
-                  <span className="text-fg">{c.name}</span>
-                  <form action={removeVersionColumn}>
-                    <input type="hidden" name="id" value={c.id} />
-                    <Button variant="ghost" type="submit" className="text-fail-strong">
-                      Usuń
-                    </Button>
-                  </form>
-                </Card>
-              </li>
-            ))}
-          </ul>
-        )}
+        <VersionColumnsList
+          versionId={version.id}
+          columns={versionColumns.map((c) => ({ id: c.id, name: c.name }))}
+        />
 
         {hiddenColumns.length > 0 && (
           <div className="flex flex-col gap-2">

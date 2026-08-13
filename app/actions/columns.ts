@@ -26,13 +26,16 @@ export async function createColumn(
   const parsed = columnSchema.safeParse({
     name: formData.get('name'),
     fieldType: formData.get('fieldType'),
-    sortOrder: formData.get('sortOrder'),
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane' }
   }
 
-  await prisma.column.create({ data: parsed.data })
+  // Kolejność auto — nowy krok na koniec; zmiana kolejności przez drag-and-drop.
+  const agg = await prisma.column.aggregate({ _max: { sortOrder: true } })
+  const sortOrder = (agg._max.sortOrder ?? 0) + 10
+
+  await prisma.column.create({ data: { ...parsed.data, sortOrder } })
   redirect(STEPS_PATH)
 }
 
@@ -47,12 +50,12 @@ export async function updateColumn(
   const parsed = columnSchema.safeParse({
     name: formData.get('name'),
     fieldType: formData.get('fieldType'),
-    sortOrder: formData.get('sortOrder'),
   })
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane' }
   }
 
+  // sortOrder nietknięty — kolejność zmienia się przez drag-and-drop.
   await prisma.column.update({ where: { id }, data: parsed.data })
   redirect(STEPS_PATH)
 }
@@ -64,6 +67,18 @@ export async function setColumnActive(formData: FormData): Promise<void> {
   if (!id) throw new Error('Brak identyfikatora kroku')
 
   await prisma.column.update({ where: { id }, data: { isActive: active } })
+  revalidatePath(STEPS_PATH)
+}
+
+// Nowa kolejność kroków katalogu (drag-and-drop) — sortOrder wg pozycji.
+export async function reorderColumns(orderedIds: string[]): Promise<void> {
+  await requireRole(['ADMIN'])
+  if (orderedIds.length === 0) return
+  await prisma.$transaction(
+    orderedIds.map((id, i) =>
+      prisma.column.update({ where: { id }, data: { sortOrder: (i + 1) * 10 } }),
+    ),
+  )
   revalidatePath(STEPS_PATH)
 }
 

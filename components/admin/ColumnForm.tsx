@@ -27,7 +27,6 @@ export function ColumnForm({
     id?: string
     name?: string
     fieldType?: ColumnFieldType
-    sortOrder?: number
   }
 }) {
   const [state, formAction, pending] = useActionState(action, initial)
@@ -59,16 +58,6 @@ export function ColumnForm({
             </option>
           ))}
         </Select>
-      </Field>
-
-      <Field label="Kolejność">
-        <Input
-          className="font-mono"
-          name="sortOrder"
-          type="number"
-          required
-          defaultValue={initialValues?.sortOrder ?? 0}
-        />
       </Field>
 
       {state.error && (

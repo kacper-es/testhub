@@ -6,7 +6,6 @@ export const columnFieldTypeSchema = z.enum(['CHECKBOX'])
 export const columnSchema = z.object({
   name: z.string().trim().min(1, 'Podaj nazwę kroku'),
   fieldType: columnFieldTypeSchema,
-  sortOrder: z.coerce.number().int('Kolejność musi być liczbą całkowitą'),
 })
 
 export const columnTemplateSchema = z.object({

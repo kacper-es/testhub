@@ -96,6 +96,39 @@ export async function removeVersionColumn(formData: FormData): Promise<void> {
   revalidate(vc.versionId)
 }
 
+// Nowa kolejność kroków wersji (drag-and-drop) — tylko kroki tej wersji, sortOrder wg pozycji.
+export async function reorderVersionColumns(
+  versionId: string,
+  orderedIds: string[],
+): Promise<void> {
+  await requireRole(['TESTER', 'ADMIN'])
+  if (!versionId || orderedIds.length === 0) return
+
+  const version = await prisma.version.findUnique({
+    where: { id: versionId },
+    select: { status: true },
+  })
+  if (!version) throw new Error('Nie znaleziono wersji')
+  assertVersionEditable(version.status)
+
+  const owned = await prisma.versionColumn.findMany({
+    where: { versionId, id: { in: orderedIds } },
+    select: { id: true },
+  })
+  const ownedSet = new Set(owned.map((o) => o.id))
+  const ids = orderedIds.filter((id) => ownedSet.has(id))
+
+  await prisma.$transaction(
+    ids.map((id, i) =>
+      prisma.versionColumn.update({
+        where: { id },
+        data: { sortOrder: (i + 1) * 10 },
+      }),
+    ),
+  )
+  revalidate(versionId)
+}
+
 // Przywrócenie ukrytego kroku (ten sam wiersz) — wartości zaznaczeń wracają (reguła 18).
 export async function restoreVersionColumn(formData: FormData): Promise<void> {
   await requireRole(['TESTER', 'ADMIN'])

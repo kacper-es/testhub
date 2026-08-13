@@ -997,6 +997,48 @@ z pełnym backfillem danych. Aplikacja czyta wartości wyłącznie przez nowe ta
 
 ---
 
+## Krok Kolumny-C — Reorder kroków (drag-and-drop) `[x]`
+
+Przeciąganie zamiast wpisywania `sortOrder` w trzech miejscach: kroki wersji
+(edycja wersji), katalog kroków (admin) i kolejność kroków w szablonie (flow).
+
+- [x] **Nowa zależność (zatwierdzona): `@dnd-kit/core` + `/sortable` + `/utilities`** —
+  drag mysz/dotyk/klawiatura, dostępne, respektuje reduced-motion
+- [x] `components/ui/SortableList.tsx` — reużywalna lista sortowalna + `DragHandle` (uchwyt „⠿")
+- [x] Akcje: `reorderColumns(orderedIds)` (ADMIN), `reorderVersionColumns(versionId, orderedIds)`
+  (TESTER/ADMIN + `assertVersionEditable`) — zapis `sortOrder` wg pozycji w transakcji
+- [x] Katalog kroków (`ColumnCatalogList`) i kroki wersji (`VersionColumnsList`) — sortowalne,
+  zapis optymistyczny (`useOptimistic`)
+- [x] Szablon (`ColumnTemplateForm`) — sortowalna lista wybranych kroków + dodawanie/usuwanie;
+  kolejność wysyłana jako uporządkowane `columnIds` (item `sortOrder` wg pozycji)
+- [x] Usunięte pola „Kolejność" z formularza kroku; nowy krok na koniec (auto `sortOrder`)
+
+### Decyzje
+- **dnd-kit, nie natywny HTML5 drag** — natywny nie działa na dotyku i nie jest dostępny
+  z klawiatury (regres a11y). dnd-kit ma sensory pointer + touch + keyboard.
+- **Uchwyt (grip), nie cały wiersz** — wiersze mają przyciski (Edytuj/Usuń/Dezaktywuj),
+  więc drag tylko za uchwyt, żeby nie kolidował z klikaniem.
+- **Reorder tylko wśród aktywnych** kroków katalogu; nieaktywne w osobnej, nieprzeciąganej sekcji.
+- **Kolejność szablonu przez submit** (uporządkowane `columnIds`), nie osobna akcja —
+  spójne z istniejącym `syncItems` (item `sortOrder` = indeks).
+- **Kolejność samego szablonu na liście** zostaje polem liczbowym (poza zakresem — dotyczyło kroków).
+
+### Jak sprawdzić
+- Admin → Konfiguracja kroków → Kroki: przeciągnij „⠿", kolejność zapisana po odświeżeniu
+- Edycja wersji → Kroki wersji: przeciągnij; kolejność = kolejność kolumn w tabeli instancji
+- Edycja szablonu: przeciągnij kroki; nowa wersja z tym flow dostaje je w tej kolejności
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + docker):**
+- `npm run check` czysto, `npx vitest run` → **34/34**, `docker compose up -d --build` (health 200).
+- Struktura sortowalna renderuje się na wszystkich 3 ekranach (uchwyty „⠿" obecne).
+- **Persystencja kolejności** (ścieżka, którą karmi drag) potwierdzona: utworzenie szablonu z
+  krokami dodanymi w kolejności [Testy, Środowisko] → item `sortOrder` w bazie **Testy > Środowisko**.
+- Uwaga narzędziowa: sam **gest drag** nie da się wysterować w panelu (dnd-kit nie reaguje na
+  syntetyczne pointer/keyboard events bez kompozycji klatek) — do ręcznego sprawdzenia w przeglądarce;
+  logika akcji reorder i wiązanie `onReorder` są proste i pokryte typami/checkiem.
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`

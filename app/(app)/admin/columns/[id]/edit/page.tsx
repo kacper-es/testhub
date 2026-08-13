@@ -27,7 +27,6 @@ export default async function EditColumnPage({
           id: column.id,
           name: column.name,
           fieldType: column.fieldType,
-          sortOrder: column.sortOrder,
         }}
       />
     </main>
