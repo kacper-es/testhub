@@ -177,20 +177,72 @@ async function seedApplications() {
   }
 }
 
+async function seedColumns() {
+  // Katalog kroków — odpowiada 4 obecnym flagom tabeli instancji. Idempotencja
+  // po deterministycznym id (backfill w kroku B będzie się do nich odwoływał).
+  const columns: Prisma.ColumnUncheckedCreateInput[] = [
+    { id: 'seed-col-env', name: 'Środowisko odtworzone', fieldType: 'CHECKBOX', sortOrder: 10 },
+    { id: 'seed-col-db', name: 'Skrypty bazodanowe', fieldType: 'CHECKBOX', sortOrder: 20 },
+    { id: 'seed-col-backend', name: 'Backend podbity', fieldType: 'CHECKBOX', sortOrder: 30 },
+    { id: 'seed-col-tests', name: 'Testy wykonane', fieldType: 'CHECKBOX', sortOrder: 40 },
+  ]
+
+  for (const column of columns) {
+    await prisma.column.upsert({
+      where: { id: column.id },
+      update: {},
+      create: column,
+    })
+  }
+}
+
+async function seedColumnTemplates() {
+  // Jeden domyślny szablon („flow") ze wszystkimi 4 krokami.
+  await prisma.columnTemplate.upsert({
+    where: { id: 'seed-coltpl-default' },
+    update: {},
+    create: { id: 'seed-coltpl-default', name: 'Domyślne flow', isDefault: true, sortOrder: 10 },
+  })
+
+  const columnIds = ['seed-col-env', 'seed-col-db', 'seed-col-backend', 'seed-col-tests']
+  for (let i = 0; i < columnIds.length; i++) {
+    await prisma.columnTemplateItem.upsert({
+      where: {
+        templateId_columnId: {
+          templateId: 'seed-coltpl-default',
+          columnId: columnIds[i],
+        },
+      },
+      update: {},
+      create: {
+        templateId: 'seed-coltpl-default',
+        columnId: columnIds[i],
+        sortOrder: i,
+      },
+    })
+  }
+}
+
 async function main() {
   await seedUsers()
   await seedTaskTemplates()
   await seedInstances()
   await seedApplications()
+  await seedColumns()
+  await seedColumnTemplates()
 
-  const [users, templates, instances, applications] = await Promise.all([
-    prisma.user.count(),
-    prisma.taskTemplate.count(),
-    prisma.instance.count(),
-    prisma.application.count(),
-  ])
+  const [users, templates, instances, applications, columns, columnTemplates] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.taskTemplate.count(),
+      prisma.instance.count(),
+      prisma.application.count(),
+      prisma.column.count(),
+      prisma.columnTemplate.count(),
+    ])
   console.log(
-    `Seed done: users=${users}, taskTemplates=${templates}, instances=${instances}, applications=${applications}`,
+    `Seed done: users=${users}, taskTemplates=${templates}, instances=${instances}, ` +
+      `applications=${applications}, columns=${columns}, columnTemplates=${columnTemplates}`,
   )
 }
 

@@ -22,6 +22,11 @@ export default async function AdminPage() {
       desc: 'Środowiska/instancje przypisywane do wersji. Konfigurowane na starcie, dodawanie, edycja, dezaktywacja, import z CSV.',
     },
     {
+      href: '/admin/columns',
+      title: 'Konfiguracja kroków i szablony',
+      desc: 'Konfigurowalne kolumny („kroki”) tabeli instancji i szablony (flow) podpinane do nowych wersji.',
+    },
+    {
       href: '/admin/users',
       title: 'Konta',
       desc: 'Tworzenie kont z hasłem tymczasowym, reset hasła, rola, dezaktywacja.',

@@ -893,6 +893,61 @@ pokazuje już tylko logo aplikacji (bez inline-selecta).
 
 ---
 
+## Krok Kolumny-A — Konfiguracja kroków i szablonów (warstwa config) `[x]`
+
+Pierwszy z dwóch kroków wprowadzania konfigurowalnych kolumn („kroków") tabeli
+instancji. Krok A jest **addytywny** — dodaje warstwę konfiguracji, nie rusza
+jeszcze 4 sztywnych flag ani logiki wersji. Cutover → Krok Kolumny-B.
+
+- [x] Schema: enum `ColumnFieldType { CHECKBOX }`, modele `Column`, `ColumnTemplate`,
+  `ColumnTemplateItem`; migracja `add_columns_and_templates` (bez zmian w `InstanceTestRun`)
+- [x] Walidacja `zod` + akcje `app/actions/columns.ts` (ADMIN): CRUD katalogu kroków
+  i szablonów (create/update/setActive/setDefault, sync kroków szablonu)
+- [x] Ekran `/admin/columns` z zakładkami (`?tab=steps|flows`) + formularze
+  `new`/`[id]/edit` dla kroków i `flows/new`/`flows/[id]/edit` dla szablonów
+- [x] Kafelek „Konfiguracja kroków i szablony" w hubie `/admin`; etykiety breadcrumb
+- [x] Seed: 4 kroki (= 4 obecne flagi) + domyślny szablon „Domyślne flow" ze wszystkimi 4
+
+### Decyzje (uzgodnione z użytkownikiem)
+- **Model 4-warstwowy:** katalog kroków (`Column`) → szablony/flow (`ColumnTemplate`
+  + `ColumnTemplateItem`, jeden `isDefault`) → kolumny wersji (`VersionColumn`, krok B,
+  **kopia przy podpięciu**) → wartości (`InstanceRunValue`, krok B, **wiersz na parę
+  run×kolumna** — zachowuje regułę 21).
+- **Kolumny per-wersja, nie globalny sztywny setting** — każda wersja może mieć inny
+  zakres kroków; dodawanie kroku „w połowie wersji" przez ekran edycji wersji (krok B).
+- **Kopia przy podpięciu** rozwiązuje archiwum bez snapshotów: rename/dezaktywacja w
+  katalogu nie rusza istniejących wersji; zamknięta wersja i tak read-only.
+- **Gotowość instancji** = wszystkie aktywne kroki checkbox danej wersji (krok B).
+- **Zero hard delete** — kroki/szablony przez `isActive`; usunięcie kroku z wersji przez
+  `excludedAt` (krok B). Edycja składu szablonu (add/remove item) to konfiguracja, nie
+  audytowane dane — dozwolone plain create/delete itemów.
+- **UI po polsku: „kroki/szablony"** (nazwa kafelka jak podał użytkownik); w kodzie
+  modele angielskie `Column`/`ColumnTemplate` (fizycznie to kolumny tabeli).
+- **URL `flows` zamiast `templates`** dla szablonów kroków — uniknięcie kolizji breadcrumb
+  z „Szablony zadań" (`/admin/templates`). `/admin/columns/flows` → redirect na zakładkę.
+
+### Odłożone → Krok Kolumny-B (cutover)
+- `VersionColumn` + `InstanceRunValue`, migracja z backfillem 4 flag do domyślnego flow
+  i runów (zachowanie zaznaczeń i archiwum), potem drop 4 kolumn boolean z `InstanceTestRun`.
+- Podpięcie domyślnego flow przy tworzeniu wersji; zarządzanie kolumnami w edycji wersji.
+- Dynamiczna tabela instancji + generyczna akcja `setColumnValue`; przepisany agregat
+  gotowości (`aggregates.ts`) + testy; changelog kluczowany po kolumnie; `overflow-x-auto`.
+
+### Jak sprawdzić
+- `/admin` → kafelek „Konfiguracja kroków i szablony"; `/admin/columns` — zakładki Kroki/Szablony
+- Zakładka Kroki: 4 zaseedowane, „Nowy krok" tworzy; Szablony: „Domyślne flow" (Domyślny, 4 kroków)
+- Edycja szablonu: zaznaczanie kroków zmienia licznik; aplikacja bez zmian (4 flagi po staremu)
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + docker):**
+- `npm run check` czysto, `npx vitest run` → **33/33**, `docker compose up -d --build` (health 200).
+- `npm run seed` ×2 idempotentny → `columns=4, columnTemplates=1`.
+- `/admin/columns`: h1, breadcrumb `Dashboard / Panel administratora / Konfiguracja kroków`,
+  zakładki Kroki(aktywna)/Szablony, 4 kroki. Zakładka Szablony: „Domyślne flow" Domyślny, 4 kroków.
+- Utworzenie kroku przez UI → pojawia się na liście. Edycja szablonu (dołączenie kroku) →
+  licznik 4→5 (sync itemów działa). Dane testowe posprzątane (columns=4, flow=4).
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`

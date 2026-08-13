@@ -31,6 +31,8 @@ const SEGMENT_LABELS: Record<string, string> = {
   users: 'Konta',
   applications: 'Aplikacje',
   changelog: 'Log zmian',
+  columns: 'Konfiguracja kroków',
+  flows: 'Szablony',
   new: 'Nowa',
   edit: 'Edycja',
 }

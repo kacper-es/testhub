@@ -42,6 +42,12 @@ enum TaskStatus {
   DONE
 }
 
+// Typ pola konfigurowalnej kolumny („kroku") w tabeli instancji. Na start tylko
+// CHECKBOX; kolejne typy (TEXT, NUMBER, SELECT…) dojdą bez zmiany struktury.
+enum ColumnFieldType {
+  CHECKBOX
+}
+
 model User {
   id                 String   @id @default(cuid())
   email              String   @unique
@@ -186,6 +192,45 @@ model InstanceTestRun {
 
   @@unique([versionId, instanceId])
   @@index([versionId, excludedAt])
+}
+
+// Katalog wielorazowych kolumn („kroków") tabeli instancji — konfiguracja admina.
+// Wersje kopiują kroki przy podpięciu (VersionColumn, krok B), więc rename/dezaktywacja
+// tutaj nie rusza istniejących wersji. Zero hard delete — dezaktywacja przez isActive.
+model Column {
+  id        String          @id @default(cuid())
+  name      String
+  fieldType ColumnFieldType @default(CHECKBOX)
+  isActive  Boolean         @default(true)
+  sortOrder Int
+  createdAt DateTime        @default(now())
+
+  templateItems ColumnTemplateItem[]
+}
+
+// Szablon („flow") — nazwany zestaw kroków. Jeden może być domyślny (isDefault):
+// przy tworzeniu wersji jego kroki są podpinane (krok B).
+model ColumnTemplate {
+  id        String   @id @default(cuid())
+  name      String
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  sortOrder Int
+  createdAt DateTime @default(now())
+
+  items ColumnTemplateItem[]
+}
+
+model ColumnTemplateItem {
+  id         String @id @default(cuid())
+  templateId String
+  columnId   String
+  sortOrder  Int
+
+  template ColumnTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  column   Column         @relation(fields: [columnId], references: [id], onDelete: Restrict)
+
+  @@unique([templateId, columnId])
 }
 
 model VersionComment {
