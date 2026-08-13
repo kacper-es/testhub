@@ -1039,6 +1039,33 @@ Przeciąganie zamiast wpisywania `sortOrder` w trzech miejscach: kroki wersji
 
 ---
 
+## Krok UI-5 — Podgląd wersji: widok roboczy, struktura w edycji `[x]`
+
+Rozdzielenie podglądu wersji (praca) od edycji (struktura), na wniosek użytkownika.
+
+- [x] Usunięta kolumna „Notatki" z tabeli instancji w podglądzie wersji
+- [x] „Odepnij" i „Podepnij instancję" przeniesione z podglądu do ekranu edycji wersji
+- [x] Podgląd wersji = czysty widok roboczy: instancje × kroki (checkboxy), bez struktury
+
+### Decyzje
+- **Oba (odepnij + podepnij) w edycji** (wybór użytkownika) — cała struktura wersji
+  (nazwa, data, aplikacja, kroki, instancje) w jednym miejscu; podgląd tylko do pracy.
+- **`NotesField`/`setNotes` zostają w kodzie jako nieużywane** (martwy kod, gdyby notatki
+  miały wrócić) — pole `InstanceTestRun.notes` w schemacie nietknięte, dane zachowane.
+- `unpinInstanceRun`/`attachInstance` rewalidują teraz też `/versions/[id]/edit`.
+
+### Jak sprawdzić
+- Podgląd wersji: tabela = Instancja + kroki; brak „Notatki", „Odepnij", „Podepnij"
+- Edycja wersji → „Instancje": lista z „Odepnij" + „Podepnij instancję"; odepnij→podepnij zachowuje zaznaczenia
+
+**Zweryfikowane w tej sesji (przeglądarka + baza + docker):**
+- `npm run check` czysto; `docker compose up -d --build` (health 200).
+- Podgląd `9.9.9`: nagłówki [Instancja, 4 kroki]; brak Notatki/Odepnij/Podepnij.
+- Edycja: sekcja „Instancje" z 5× „Odepnij" + „Podepnij"; odpięcie Klient A → 4 aktywne
+  + opcja „Klient A (były dane)"; ponowne podpięcie → 5 aktywnych, **20 wartości true zachowane**.
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`

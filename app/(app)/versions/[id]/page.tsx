@@ -20,10 +20,6 @@ import {
   InstanceRunsTable,
   type LastChangeMap,
 } from '@/components/versions/InstanceRunsTable'
-import {
-  AttachInstance,
-  type AttachOption,
-} from '@/components/versions/AttachInstance'
 import { CommentForm } from '@/components/versions/CommentForm'
 import Link from 'next/link'
 import { AppIcon } from '@/components/versions/AppIcon'
@@ -195,26 +191,6 @@ export default async function VersionDetailPage({
 
   const activeRuns = version.testRuns.filter((r) => r.excludedAt === null)
 
-  // „Podepnij instancję": aktywne instancje bez aktywnego runu (brak lub odpięty).
-  const runByInstanceId = new Map(
-    version.testRuns.map((r) => [r.instanceId, r]),
-  )
-  const activeInstances = await prisma.instance.findMany({
-    where: { isActive: true },
-    orderBy: { name: 'asc' },
-    select: { id: true, name: true },
-  })
-  const attachOptions: AttachOption[] = activeInstances
-    .filter((i) => {
-      const r = runByInstanceId.get(i.id)
-      return !r || r.excludedAt !== null
-    })
-    .map((i) => ({
-      id: i.id,
-      name: i.name,
-      hadData: runByInstanceId.has(i.id),
-    }))
-
   const rows = version.tasks
     .map((task) => ({
       task,
@@ -334,9 +310,6 @@ export default async function VersionDetailPage({
           disabled={disabled}
           lastChanges={lastChanges}
         />
-        {!disabled && (
-          <AttachInstance versionId={version.id} options={attachOptions} />
-        )}
       </section>
 
       <section className="flex flex-col gap-3">

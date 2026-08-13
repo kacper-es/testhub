@@ -137,6 +137,7 @@ export async function unpinInstanceRun(formData: FormData): Promise<void> {
     data: { excludedAt: new Date(), updatedById: user.id },
   })
   revalidatePath(`/versions/${run.versionId}`)
+  revalidatePath(`/versions/${run.versionId}/edit`)
 }
 
 // Podepnij instancję (reguła 20): jeśli istnieje odpięty run — przywróć
@@ -172,4 +173,5 @@ export async function attachInstance(formData: FormData): Promise<void> {
   }
 
   revalidatePath(`/versions/${versionId}`)
+  revalidatePath(`/versions/${versionId}/edit`)
 }

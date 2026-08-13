@@ -7,9 +7,14 @@ import {
   addVersionColumns,
   restoreVersionColumn,
 } from '@/app/actions/version-columns'
+import { unpinInstanceRun } from '@/app/actions/test-runs'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { VersionColumnsList } from '@/components/versions/VersionColumnsList'
+import {
+  AttachInstance,
+  type AttachOption,
+} from '@/components/versions/AttachInstance'
 import { EditVersionForm } from './edit-version-form'
 
 export default async function EditVersionPage({
@@ -81,6 +86,26 @@ export default async function EditVersionPage({
     (c) => !usedColumnIds.has(c.id) && !usedNames.has(c.name),
   )
 
+  // Instancje wersji: aktywne runy (do odpięcia) + opcje podpięcia (reguła 20).
+  const testRuns = await prisma.instanceTestRun.findMany({
+    where: { versionId: id },
+    include: { instance: { select: { name: true } } },
+    orderBy: { instance: { name: 'asc' } },
+  })
+  const activeRuns = testRuns.filter((r) => r.excludedAt === null)
+  const runByInstanceId = new Map(testRuns.map((r) => [r.instanceId, r]))
+  const activeInstances = await prisma.instance.findMany({
+    where: { isActive: true },
+    orderBy: { name: 'asc' },
+    select: { id: true, name: true },
+  })
+  const attachOptions: AttachOption[] = activeInstances
+    .filter((i) => {
+      const r = runByInstanceId.get(i.id)
+      return !r || r.excludedAt !== null
+    })
+    .map((i) => ({ id: i.id, name: i.name, hadData: runByInstanceId.has(i.id) }))
+
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
       <div>
@@ -149,6 +174,38 @@ export default async function EditVersionPage({
             </div>
           </form>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Instancje</h2>
+          <p className="mt-1 text-sm text-muted">
+            Instancje podpięte do tej wersji. Odpięcie chowa instancję (dane
+            zaznaczeń zostają i wrócą po ponownym podpięciu).
+          </p>
+        </div>
+
+        {activeRuns.length === 0 ? (
+          <p className="text-sm text-muted">Brak podpiętych instancji.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {activeRuns.map((r) => (
+              <li key={r.id}>
+                <Card className="flex items-center justify-between gap-3 py-2">
+                  <span className="text-fg">{r.instance.name}</span>
+                  <form action={unpinInstanceRun}>
+                    <input type="hidden" name="runId" value={r.id} />
+                    <Button variant="ghost" type="submit" className="text-fail-strong">
+                      Odepnij
+                    </Button>
+                  </form>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <AttachInstance versionId={version.id} options={attachOptions} />
       </section>
     </main>
   )

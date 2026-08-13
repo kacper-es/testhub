@@ -1,8 +1,5 @@
 import type { Instance, InstanceTestRun } from '@prisma/client'
-import { unpinInstanceRun } from '@/app/actions/test-runs'
 import { FlagCheckbox } from '@/components/versions/FlagCheckbox'
-import { NotesField } from '@/components/versions/NotesField'
-import { Button } from '@/components/ui/Button'
 
 type Run = InstanceTestRun & { instance: Instance }
 
@@ -25,17 +22,6 @@ function tooltip(
   return last ? `${base}: ${last.user}, ${last.when}` : base
 }
 
-function UnpinButton({ runId }: { runId: string }) {
-  return (
-    <form action={unpinInstanceRun}>
-      <input type="hidden" name="runId" value={runId} />
-      <Button variant="ghost" type="submit" className="text-fail-strong">
-        Odepnij
-      </Button>
-    </form>
-  )
-}
-
 function InstanceName({ instance }: { instance: Instance }) {
   return (
     <span className="flex flex-col">
@@ -47,6 +33,8 @@ function InstanceName({ instance }: { instance: Instance }) {
   )
 }
 
+// Tabela robocza w podglądzie wersji: instancje × kroki (checkboxy). Podpinanie
+// i odpinanie instancji jest w edycji wersji, nie tutaj.
 export function InstanceRunsTable({
   runs,
   columns,
@@ -93,8 +81,6 @@ export function InstanceRunsTable({
                   {c.name}
                 </th>
               ))}
-              <th className="px-3 py-2 font-semibold text-muted">Notatki</th>
-              {!disabled && <th className="px-3 py-2" />}
             </tr>
           </thead>
           <tbody>
@@ -115,18 +101,6 @@ export function InstanceRunsTable({
                     />
                   </td>
                 ))}
-                <td className="px-3 py-2">
-                  <NotesField
-                    runId={run.id}
-                    notes={run.notes}
-                    disabled={disabled}
-                  />
-                </td>
-                {!disabled && (
-                  <td className="px-3 py-2 text-right">
-                    <UnpinButton runId={run.id} />
-                  </td>
-                )}
               </tr>
             ))}
           </tbody>
@@ -140,10 +114,7 @@ export function InstanceRunsTable({
             key={run.id}
             className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3"
           >
-            <div className="flex items-center justify-between gap-3">
-              <InstanceName instance={run.instance} />
-              {!disabled && <UnpinButton runId={run.id} />}
-            </div>
+            <InstanceName instance={run.instance} />
             {columns.length > 0 && (
               <div className="flex flex-col gap-2">
                 {columns.map((c) => (
@@ -164,7 +135,6 @@ export function InstanceRunsTable({
                 ))}
               </div>
             )}
-            <NotesField runId={run.id} notes={run.notes} disabled={disabled} />
           </div>
         ))}
       </div>
