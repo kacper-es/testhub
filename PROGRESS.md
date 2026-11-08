@@ -1213,13 +1213,16 @@ do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
 
 ---
 
-## Krok D-1 — Wdrożenie na VM (Portainer) `[ ]`
+## Krok D-1 — Wdrożenie (Portainer + Swarm) `[x]`
 
-Ustalone 2026-11-08, jeszcze nic nie zbudowane. Dokumentacja wdrożenia: README → „Wdrożenie (Portainer)".
+2026-11-08: zrobione `COOKIE_SECURE`, D-1a, D-1b, D-1c. Zostało pierwsze prawdziwe wdrożenie
+po stronie użytkownika (tag `v1.0.0`, upublicznienie pakietu, stack w Portainerze, HAProxy).
+Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 
 ### Ustalenia
-- **Portainer, stack z repozytorium Git** — Portainer klonuje repo i buduje obraz z `build: .`.
-  Zmienne (`POSTGRES_*`, `SESSION_SECRET`, `JIRA_*`) w „Environment variables" stacka, nie w `.env`.
+- **Docker Swarm zarządzany przez Portainer**, gotowy obraz z `ghcr.io` (Swarm nie buduje
+  obrazów — pierwotny pomysł „stack z repo, Portainer buduje" porzucony). Postgres w stacku.
+  HTTPS na osobnym HAProxy. Zmienne w „Environment variables" stacka, nie w `.env`.
 - **VM ma wychodzący internet** (npm w czasie builda, Jira Cloud). „Brak dostępu z internetu"
   w specyfikacji dotyczy ruchu przychodzącego — aplikacja widoczna tylko w sieci firmowej.
   Założenie „brak internetu w czasie builda" (fonty) było ostrożnością, nie faktem o infrastrukturze;
@@ -1228,12 +1231,14 @@ Ustalone 2026-11-08, jeszcze nic nie zbudowane. Dokumentacja wdrożenia: README 
 ### Do zrobienia (każde z planem do akceptacji)
 - [x] **Flaga `secure` cookie** — przełącznik `COOKIE_SECURE` (decyzja użytkownika 2026-11-08,
   szczegóły niżej). Weryfikacja w Dockerze — patrz „Jak sprawdzić".
-- [ ] **Pierwszy admin na produkcji** — `npm run seed` wymaga `tsx` (devDependency, nie ma go
-  w obrazie) i zakłada konta z hasłem `Dev12345!` + przykładowe dane. Potrzebny skrypt w czystym
-  JS w obrazie, uruchamiany z konsoli kontenera w Portainerze, zakładający tylko jednego ADMIN-a.
-- [ ] **Port `5432`** wystawiony w `docker-compose.yml` (potrzebny lokalnie) — na VM nie może być
-  otwarty. Do decyzji: osobny plik compose dla Portainera albo przeniesienie portu do override'u lokalnego.
-- [ ] **Aktualizacje** — sprawdzić, czy redeploy stacka w Portainerze przebudowuje obraz po zmianie kodu.
+- [x] **D-1a Pierwszy admin** — domyślne konto przy starcie na pustej bazie (szczegóły niżej).
+- [x] **D-1b Publiczny obraz** — `LICENSE` (MIT), GitHub Actions → `ghcr.io` przy tagu `v*`
+  (szczegóły niżej). Upublicznienie repo i pakietu robi użytkownik.
+- [x] **D-1c Stack pod Swarma** — `docker-stack.yml` + README (szczegóły niżej).
+- Backlog: dedykowany endpoint zdrowia z kodem 503 przy błędzie bazy (healthcheck nie musiałby
+  parsować HTML); Swarm secrets (`*_FILE`) zamiast zmiennych z hasłami.
+- Backlog uniwersalności: obraz `linux/arm64`, README po angielsku, i18n UI, wstęp `CLAUDE.md` („Wewnętrzna aplikacja
+  dla 4 testerów…"), tekst „Zaloguj się firmowym adresem email" na `/login`.
 
 ### Decyzje
 - **`COOKIE_SECURE` w env** zamiast stałego `NODE_ENV === 'production'`. Jeden helper
@@ -1245,15 +1250,56 @@ Ustalone 2026-11-08, jeszcze nic nie zbudowane. Dokumentacja wdrożenia: README 
   testowalne bez mutowania `process.env`.
 - `docker-compose.yml`: `COOKIE_SECURE: ${COOKIE_SECURE:-}`; `.env.example` z ostrzeżeniem
   o cookie otwartym tekstem po HTTP.
+- **Kierunek projektu (2026-11-08):** narzędzie uniwersalne i publiczne — każda firma może je
+  wdrożyć i skonfigurować. Pierwsze wdrożenie: Docker Swarm przez Portainer, HTTPS na zewnętrznym
+  HAProxy (`COOKIE_SECURE` puste). Zamiast budowania w Portainerze: publiczny obraz w `ghcr.io`
+  z GitHub Actions (D-1b), stack pod Swarma (D-1c).
+- **D-1a — domyślny admin (wzorem Grafany).** `instrumentation.ts` (hook Next, tylko runtime
+  Node, po `migrate deploy`) woła `ensureInitialAdmin()` z `lib/auth/bootstrap.ts`: gdy tabela
+  `User` jest **całkiem pusta** (nieaktywne też się liczą), zakłada ADMIN-a `admin@example.com` /
+  `admin` z `mustChangePassword: true` — istniejąca brama wymusza zmianę hasła.
+  Login w formie e-maila (decyzja użytkownika) — walidacja logowania bez zmian. Adres
+  `admin@example.com` (domena zarezerwowana, RFC 2606), bo `admin@releasehub.local` ma już
+  seed, który nie nadpisuje istniejących kont. Wyścig replik → P2002 pomijany. Bez `ChangeLog`
+  (jak `createUser`; brak aktora). Log startowy bez hasła. Bez zmian schematu i zależności.
+- Seed zostaje narzędziem deweloperskim — wcześniejszy pomysł skryptu admina w obrazie porzucony.
+- **D-1b — licencja MIT**, właściciel praw `kacper-es` (decyzja użytkownika). `package.json`
+  zostaje `"private": true` (blokuje tylko `npm publish`, nie dotyczy licencji).
+- **D-1b — `.github/workflows/release.yml`**: zadanie `test` (Node 22 jak w Dockerfile,
+  `npm ci` → `npm run check` → `npx vitest run`) na każdym pushu na `main`, PR i tagu; zadanie
+  `image` tylko dla tagów `v*`, po zielonym `test`. Logowanie do ghcr.io wbudowanym
+  `GITHUB_TOKEN` (`packages: write` tylko w tym zadaniu, reszta `contents: read`) — zero sekretów.
+  Tagi obrazu z `metadata-action`: `X.Y.Z`, `X.Y`, `latest`. Tylko `linux/amd64`; cache warstw `gha`.
+  Akcje (zatwierdzone w planie): `actions/checkout@v4`, `actions/setup-node@v4`,
+  `docker/setup-buildx-action@v3`, `docker/login-action@v3`, `docker/metadata-action@v5`,
+  `docker/build-push-action@v6`.
+- **Dockerfile:** etykiety `org.opencontainers.image.source` (łączy pakiet z repo) i `.licenses`.
+- **D-1c — osobny `docker-stack.yml`**, `docker-compose.yml` bez zmian (dev: build + port 5432).
+  Obraz `ghcr.io/kacper-es/testhub:${RELEASEHUB_VERSION:-latest}`, port `${RELEASEHUB_PORT:-3000}`
+  przez routing mesh (cel dla HAProxy). Działa też jako zwykły stack compose (placement ignorowane).
+- **Baza przypięta etykietą noda** `node.labels.releasehub.db == true` (wolumen lokalny dla noda);
+  bez etykiety `db` czeka „no suitable node" zamiast wstać pusta na innym nodzie. Bez portu,
+  `stop_grace_period: 1m`.
+- **App:** 1 replika, `restart_policy: any`; `update_config`/`rollback_config` `stop-first`
+  (migracje nie biegną obok starej wersji), `failure_action: rollback`. `depends_on` pominięte
+  (Swarm ignoruje) — przy starcie przed bazą `P1001` → restart do skutku (opisane w README).
+- **Healthcheck app:** `wget` na `/health` + `grep 'OK</p>'` — strona zwraca 200 także przy błędzie
+  bazy, a React renderuje „Baza: <!-- -->OK" (pierwsza wersja z `grep 'Baza: OK'` nigdy nie
+  przechodziła — wykryte na Swarmie). `start_period: 60s`. Bez zmian kodu (wget jest w obrazie).
+- **README:** HAProxy — backend na dowolny nod, TLS na proxy, `X-Forwarded-Proto: https`,
+  **bez przepisywania `Host`** (Server Actions porównują `Origin` z `Host`), `COOKIE_SECURE` puste.
 
 ### Pytania otwarte
-- Czy w firmie jest reverse proxy z HTTPS (Traefik/nginx przy Portainerze) i firmowe CA?
-- Kopia zapasowa bazy (`pg_dump` z crona na VM) — poza aplikacją (MVP), ale ktoś musi ją ustawić.
+- Kopia zapasowa bazy (`pg_dump` z crona na nodzie z etykietą) — poza aplikacją, ktoś musi ją ustawić.
 
 ### Jak sprawdzić
-- Stack wstaje w Portainerze, logi `app`: `Running prisma migrate deploy...` → Ready
-- `http://<vm>:3000/health` → „Baza: OK"; port `5432` niedostępny z innej maszyny
-- Logowanie pierwszym adminem działa z przeglądarki w sieci firmowej
+- Stack bez etykiety noda → `db` „no suitable node"; po etykiecie `db` 1/1, `app` 1/1 i healthy
+- `https://<adres z HAProxy>/health` → „Baza: OK"; port `5432` niedostępny z innej maszyny
+- Pusta baza → w logach `app` „Created initial admin account admin@example.com…";
+  logowanie `admin@example.com` / `admin` → wymuszona zmiana hasła → dashboard;
+  restart nie zakłada drugiego konta
+- Push tagu `v1.0.0` → w Actions zielone `test` i `image`; `docker pull ghcr.io/kacper-es/testhub:1.0.0`
+  z maszyny bez logowania do ghcr.io działa (pakiet publiczny)
 - `COOKIE_SECURE=false`, `http://<host>:3000`: logowanie działa; odpowiedź z middleware
   (`curl -sI -b rh_session=x http://<host>:3000/`) ma `Set-Cookie` **bez** `Secure`
 - Ten sam obraz bez `COOKIE_SECURE`: ten sam `curl` → `Set-Cookie` **z** `Secure`
@@ -1266,6 +1312,35 @@ Ustalone 2026-11-08, jeszcze nic nie zbudowane. Dokumentacja wdrożenia: README 
   logowanie przez `http://localhost:3000` → dashboard, przejście na `/archive` bez wylogowania.
 - Ten sam obraz, `docker compose up -d` bez zmiennej (kontener odtworzony, `COOKIE_SECURE` puste):
   ten sam `curl` → `… Secure; HttpOnly; SameSite=lax`. **Middleware czyta zmienną w runtime.**
+- **D-1a:** `npm run check` czysto; `npx vitest run` → **74/74** (nowy `bootstrap.test.ts`, 4 testy:
+  pusta baza → ADMIN z `mustChangePassword` i hasłem `admin`; istniejące konto → nic; P2002 → nic;
+  inny błąd → propagowany). Docker na osobnym projekcie (`-p rh-bootstrap`, pusty wolumen,
+  port 3001): 5 migracji → log „Created initial admin account admin@example.com…", w bazie
+  1 konto ADMIN z `mustChangePassword`. Przeglądarka: `admin@example.com`/`admin` →
+  `/change-password`; wejście na `/` → z powrotem `/change-password`; zmiana hasła → `/login`;
+  stare hasło odrzucone, nowe → dashboard. Restart kontenera → brak drugiego konta (1 wpis
+  w logu, 1 konto). Projekt testowy usunięty z wolumenem (`down -v`).
+- **D-1b:** `actionlint` 1.7.7 (w Dockerze) na workflow → 0 błędów. `npm run check` czysto,
+  `npx vitest run` → 74/74 (te same komendy co w CI). `docker build` → etykiety `source`
+  i `licenses` obecne w obrazie (obraz testowy usunięty). Próba `npm ci` na czystej kopii
+  plików z gita odrzucona przez uprawnienia sesji — pominięta.
+- **Niezweryfikowane (D-1b):** przebieg workflow na GitHubie i publikacja w ghcr.io — dopiero
+  przy pierwszym tagu użytkownika. Po nim sprawdzić widoczność pakietu
+  (Packages → testhub → Package settings → Public).
+- **D-1c (lokalny jednowęzłowy Swarm, `docker swarm init`, obraz zbudowany lokalnie jako
+  `ghcr.io/kacper-es/testhub:test`, `COOKIE_SECURE=false`):**
+  - bez etykiety: `db` Pending „no suitable node (scheduling constraints not satisfied)";
+    `app` restartuje się z `P1001: Can't reach database server at db:5432`;
+  - po etykiecie: `db` 1/1, migracje, „Created initial admin account…"; pierwsza wersja
+    healthchecka nie przechodziła (komentarz Reacta w HTML) → poprawiona, `app` healthy po 15 s;
+  - `/health` przez routing mesh na `localhost:3000` OK; port 5432 zamknięty, `db` bez portów;
+  - przeglądarka: `admin@example.com`/`admin` → `/change-password`;
+  - `db` przeskalowana do 0 → `app` unhealthy po 70 s, Swarm restartuje; `db` z powrotem →
+    `app` healthy po 15 s, dane zachowane (1 konto w bazie);
+  - sprzątanie: `docker stack rm`, wolumen testowy usunięty, `docker swarm leave --force`,
+    obraz testowy usunięty, lokalny stack compose wznowiony.
+- **Niezweryfikowane (D-1c):** wielowęzłowy Swarm (przypięcie bazy do innego noda niż app),
+  Portainer i HAProxy z HTTPS — dopiero przy wdrożeniu u użytkownika.
 - Środowisko: Docker Desktop nie wstawał (martwe sockety w `%LOCALAPPDATA%\Docker\run`
   i `%LOCALAPPDATA%\docker-secrets-engine`, przeniesione na bok jako `*.broken-20261108-*`
   za zgodą użytkownika); naprawił dopiero restart Windows — przy kolejnej awarii zacząć od restartu.

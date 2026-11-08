@@ -1,0 +1,73 @@
+# Release Hub — stack for Docker Swarm (Portainer: Stacks → Add stack).
+# Local development uses docker-compose.yml (builds the image, exposes 5432).
+#
+# Before the first deploy, label the node that will hold the database volume:
+#   docker node update --label-add releasehub.db=true <node>
+# (Portainer: Swarm → node → Labels). Without the label `db` stays pending.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    # No published port — the database is reachable only from the stack network.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    stop_grace_period: 1m
+    deploy:
+      replicas: 1
+      placement:
+        # The volume is local to a node — keep the database on the labelled one.
+        constraints:
+          - node.labels.releasehub.db == true
+      restart_policy:
+        condition: any
+        delay: 5s
+
+  app:
+    # Pin a released version (e.g. 1.0.0); update = change it and redeploy.
+    image: ghcr.io/kacper-es/testhub:${RELEASEHUB_VERSION:-latest}
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
+      SESSION_SECRET: ${SESSION_SECRET}
+      # Empty = `secure` cookies (HTTPS in front). `false` only for plain HTTP.
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      JIRA_BASE_URL: ${JIRA_BASE_URL:-}
+      JIRA_EMAIL: ${JIRA_EMAIL:-}
+      JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
+    ports:
+      # Routing mesh: reachable on this port on every node (reverse proxy target).
+      - "${RELEASEHUB_PORT:-3000}:3000"
+    # Swarm ignores depends_on: if the app starts before the database, the
+    # migration fails, the container exits and is restarted until `db` is up.
+    healthcheck:
+      # /health answers 200 even when the database is down — check the body.
+      # React renders "Baza: <!-- -->OK</p>", so match the end of the paragraph.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health | grep -q 'OK</p>'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 5s
+      update_config:
+        # Stop the old version first — migrations never run next to it.
+        order: stop-first
+        failure_action: rollback
+        monitor: 60s
+      rollback_config:
+        order: stop-first
+
+volumes:
+  pgdata:

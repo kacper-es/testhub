@@ -12,7 +12,7 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)
-![tests](https://img.shields.io/badge/testy-70%20passing-3B6D11?style=flat-square)
+![tests](https://img.shields.io/badge/testy-74%20passing-3B6D11?style=flat-square)
 
 [Specyfikacja](PROMPT-release-hub-mvp.md) ·
 [Reguły projektu](CLAUDE.md) ·
@@ -67,25 +67,75 @@ Postgres trzyma dane w named volume `pgdata` — przetrwają `docker compose dow
 | `DATABASE_URL` | Tylko dla lokalnych narzędzi (host `localhost`); w kontenerze nadpisywany na host `db` |
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Opcjonalne — puste = integracja nieskonfigurowana |
 
-## 🏢 Wdrożenie (Portainer)
+## 🏢 Wdrożenie (Docker Swarm + Portainer)
 
-Docelowo: firmowa VM z Portainerem, stack z repozytorium Git. VM ma wychodzący
-internet (build pobiera paczki npm, integracja łączy się z Jira Cloud); aplikacja
-nie jest dostępna z internetu.
+Produkcja używa gotowego obrazu z `ghcr.io` i pliku [`docker-stack.yml`](docker-stack.yml)
+(`docker-compose.yml` służy tylko do lokalnego rozwoju — buduje obraz i wystawia port bazy).
+Ten sam plik działa też jako zwykły stack compose w Portainerze bez Swarma.
 
-1. Portainer → **Stacks → Add stack → Repository**: URL repo + dane dostępowe,
-   ścieżka compose `docker-compose.yml`. Portainer klonuje repo i buduje obraz (`build: .`).
-2. **Environment variables** stacka: wartości z tabeli wyżej (nowe hasło bazy, nowy
-   `SESSION_SECRET`). Plik `.env` nie trafia do Portainera — jest w `.gitignore`.
-   Bez HTTPS przed aplikacją ustaw `COOKIE_SECURE=false`, inaczej logowanie się zapętla
-   (cookie sesji idzie wtedy przez sieć otwartym tekstem — docelowo reverse proxy z TLS).
-3. **Deploy the stack.** Entrypoint aplikacji uruchamia `prisma migrate deploy` przed startem;
-   błąd migracji zatrzymuje kontener (logi: **Containers → app → Logs**).
-4. Sprawdź `http://<vm>:3000/health` → „Baza: OK".
+1. **Etykieta noda pod bazę** (raz). Wolumen Postgresa jest lokalny dla noda, więc baza
+   jest przypięta do noda z etykietą — Portainer: **Swarm → nod → Labels**
+   (`releasehub.db` = `true`) albo:
+   ```bash
+   docker node update --label-add releasehub.db=true <nod>
+   ```
+   Bez etykiety usługa `db` czeka ze stanem „no suitable node".
+2. Portainer → **Stacks → Add stack**: wklej `docker-stack.yml` (**Web editor**) albo wskaż
+   repozytorium i ścieżkę `docker-stack.yml` (**Repository**).
+3. **Environment variables** stacka — wartości z tabeli wyżej (nowe hasło bazy, nowy
+   `SESSION_SECRET`) oraz:
 
-> **Jeszcze nie gotowe do produkcji** — zobacz krok D-1 w [`PROGRESS.md`](PROGRESS.md):
-> `npm run seed` zakłada konta z hasłem deweloperskim, a `docker-compose.yml` wystawia
-> port bazy `5432`.
+   | Zmienna | Opis |
+   |---|---|
+   | `RELEASEHUB_VERSION` | Wersja obrazu, np. `1.0.0` (domyślnie `latest` — przypnij wersję) |
+   | `RELEASEHUB_PORT` | Port publikowany na nodach (domyślnie `3000`) |
+
+   `COOKIE_SECURE` zostaw puste, gdy przed aplikacją jest HTTPS (patrz niżej).
+4. **Deploy the stack.** Przy pierwszym starcie aplikacja może kilka razy się zrestartować
+   z `P1001: Can't reach database server` — Swarm nie czeka na bazę (`depends_on` jest
+   ignorowane), więc kontener startuje ponownie, aż baza wstanie. Potem `migrate deploy`
+   i założenie domyślnego admina (patrz niżej). Usługa `app` ma healthcheck na `/health`.
+5. Zaloguj się domyślnym kontem i ustaw własne hasło.
+
+**Aktualizacja:** nowy tag (`git tag vX.Y.Z` → obraz w ghcr.io), w stacku zmień
+`RELEASEHUB_VERSION` i zrób redeploy. Stara wersja jest zatrzymywana przed startem nowej
+(migracje nie biegną obok niej); gdy nowa nie przejdzie healthchecka, Swarm wraca do poprzedniej.
+
+**Reverse proxy z HTTPS (np. HAProxy na osobnej maszynie):**
+
+- backend: `<dowolny nod Swarma>:3000` (routing mesh przekieruje do kontenera),
+- TLS kończony na proxy, nagłówek `X-Forwarded-Proto: https`,
+- **nie przepisuj nagłówka `Host`** — Server Actions w Next.js porównują `Origin` z `Host`;
+  zmieniony `Host` psuje wszystkie formularze,
+- `COOKIE_SECURE` w stacku puste (cookie z flagą `secure`).
+
+Kopia zapasowa bazy jest poza aplikacją — np. `pg_dump` z crona na nodzie z etykietą.
+
+### Obraz i wydawanie wersji
+
+Gotowy obraz: **`ghcr.io/kacper-es/testhub`** (tagi `X.Y.Z`, `X.Y`, `latest`).
+Buduje go GitHub Actions ([`.github/workflows/release.yml`](.github/workflows/release.yml)):
+
+- każdy push na `main` i PR → `npm run check` + testy,
+- tag `v*` → te same testy, potem build i publikacja obrazu:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+### Pierwsze uruchomienie — domyślny admin
+
+Przy starcie na **pustej** bazie (zero kont) aplikacja zakłada konto administratora:
+
+| Login | Hasło |
+|---|---|
+| `admin@example.com` | `admin` |
+
+Pierwsze logowanie wymusza zmianę hasła — bez tego żaden ekran nie jest dostępny.
+Konto powstaje tylko raz: gdy w bazie jest jakiekolwiek konto (także nieaktywne),
+nic się nie dzieje. Pozostałe konta admin zakłada w `/admin/users`.
+**Nie uruchamiaj `npm run seed` na produkcji** — to dane deweloperskie.
 
 ## 🧑‍💻 Rozwój lokalny
 
@@ -117,6 +167,8 @@ lokalnie przeciw `DATABASE_URL` z `.env` (baza w kontenerze na `localhost:5432`)
 
 Wszystkie z `mustChangePassword: false` i wspólnym hasłem **`Dev12345!`**.
 W produkcji admin ustawia własne hasła — nie używaj tych wartości poza dev.
+Jeśli aplikacja wystartowała na pustej bazie przed seedem, w bazie jest też
+domyślne konto `admin@example.com` (patrz „Pierwsze uruchomienie”).
 
 | Email | Rola |
 |---|---|
@@ -174,6 +226,10 @@ Mutacje przez **Server Actions** z walidacją `zod`; autoryzacja wyłącznie prz
 `requireRole()` po stronie serwera; zero hard delete (dezaktywacja przez `isActive`,
 odpinanie przez `excludedAt`); każda mutacja audytowana w `ChangeLog` w tej samej
 transakcji. Pełny zestaw niezmienników → [`CLAUDE.md`](CLAUDE.md).
+
+## 📄 Licencja
+
+[MIT](LICENSE)
 
 ## 📌 Stan
 

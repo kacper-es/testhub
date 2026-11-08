@@ -30,6 +30,9 @@ RUN npm ci --omit=dev
 
 # --- runner: minimalny runtime, użytkownik non-root ---
 FROM base AS runner
+# Links the ghcr.io package to the repository (visibility and permissions).
+LABEL org.opencontainers.image.source="https://github.com/kacper-es/testhub"
+LABEL org.opencontainers.image.licenses="MIT"
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
