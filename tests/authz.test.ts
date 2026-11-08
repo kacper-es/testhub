@@ -18,6 +18,7 @@ import { prisma } from '@/lib/prisma'
 import { createVersion } from '@/app/actions/versions'
 import { addComment } from '@/app/actions/comments'
 import { VersionClosedError } from '@/lib/versions/guard'
+import { testJiraConnection } from '@/app/actions/jira'
 
 const mockedGetSessionUser = vi.mocked(getSessionUser)
 const mockedFindVersion = vi.mocked(prisma.version.findUnique)
@@ -103,5 +104,16 @@ describe('mutacja na zamkniętej wersji (read-only wymuszone po stronie serwera)
     await expect(addComment('v1', 'treść')).rejects.toBeInstanceOf(
       VersionClosedError,
     )
+  })
+})
+
+describe('testJiraConnection (tylko ADMIN)', () => {
+  beforeEach(() => mockedGetSessionUser.mockReset())
+
+  it.each(['PM', 'TESTER'] as const)('%s dostaje odmowę', async (role) => {
+    mockedGetSessionUser.mockResolvedValue(user(role))
+    await expect(
+      testJiraConnection({ status: 'idle' }, new FormData()),
+    ).rejects.toBeInstanceOf(AuthorizationError)
   })
 })

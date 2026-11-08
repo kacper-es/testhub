@@ -25,6 +25,7 @@ const FIELD_LABEL: Record<string, string> = {
   application: 'aplikacja',
   name: 'nazwa',
   releaseDate: 'data wydania',
+  jiraVersion: 'wersja Jira',
 }
 
 const fmt = new Intl.DateTimeFormat('pl-PL', {

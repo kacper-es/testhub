@@ -252,6 +252,8 @@ export async function updateVersion(
           name: true,
           releaseDate: true,
           applicationId: true,
+          jiraVersionId: true,
+          jiraVersionName: true,
           application: { select: { name: true } },
         },
       })
@@ -296,6 +298,18 @@ export async function updateVersion(
           oldValue: version.application?.name ?? null,
           newValue: newName,
         })
+
+        // Wersja Jira należy do projektu poprzedniej aplikacji — odpinamy (J-2).
+        if (version.jiraVersionId !== null) {
+          data.jiraVersionId = null
+          data.jiraVersionName = null
+          logs.push({
+            ...base,
+            field: 'jiraVersion',
+            oldValue: version.jiraVersionName,
+            newValue: null,
+          })
+        }
       }
 
       if (logs.length === 0) return // nic się nie zmieniło

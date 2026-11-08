@@ -1066,6 +1066,160 @@ Rozdzielenie podglądu wersji (praca) od edycji (struktura), na wniosek użytkow
 
 ---
 
+## Integracja Jira (po MVP) — plan `[ ]`
+
+Plan uzgodniony 2026-10-23, jeszcze nic nie zbudowane. Przed J-1: przenieść Jira z „Poza zakresem"
+do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
+
+### Ustalenia
+- **Jira Cloud** (`*.atlassian.net`), REST API v3, Basic auth: e-mail konta + API token.
+  Konto/token utworzy użytkownik później. Sekrety tylko w env (`JIRA_BASE_URL`, `JIRA_EMAIL`,
+  `JIRA_API_TOKEN`), nigdy w bazie ani w repo. VM ma dostęp do Jiry.
+- **Read-only** — zero zapisu do Jiry.
+- **Przynależność ticketu do wersji = `fixVersion`.** `Application` ↔ projekt Jira,
+  `Version` ↔ wersja projektu Jira (wybór z listy pobranej z Jiry).
+- **„Gotowe" = kategoria statusu `Done`** (`statusCategory.key = "done"`).
+- **Jira zastępuje ręczny licznik `TICKET_AGGREGATE`** (zaakceptowane 2026-10-25):
+  wersje zamknięte zachowują historyczne wartości ręczne (read-only); otwarte bez podpiętej
+  wersji Jira pokazują „—" + „Niepodpięta do Jira". Kolumny `manualCounter*` zostają w schemacie.
+- **Zarządzanie integracją: tylko ADMIN** (konfiguracja, mapowanie, „Synchronizuj teraz").
+- **Lokalna kopia ticketów** (`JiraIssue`), odświeżana pullem — widoki i polling 5 s nie
+  odpytują Jiry. Wersje zamknięte (`RELEASED`/`CANCELLED`) nie są synchronizowane.
+- Bez nowych zależności (wbudowany `fetch`). Zmiany `schema.prisma` — diff do akceptacji w każdym kroku.
+
+### Kroki
+- [x] **J-1** Połączenie: klient Jira (`fetch` + auth z env, obsługa 401/403/404/429/5xx),
+  strona admina „Jira" z „Testuj połączenie" i stanem konfiguracji. Paginacja → J-3.
+- [x] **J-2** Mapowanie: `Application.jiraProjectKey`, `Version.jiraVersionId` (wybór z listy wersji projektu).
+- [ ] **J-3** Synchronizacja ticketów do `JiraIssue` (ręczna, ADMIN): JQL `fixVersion = <id>`,
+  przyrostowo po `updated`; klucz, tytuł, typ, status, kategoria statusu, przypisany, `updated`.
+- [ ] **J-4** Widok ticketów w wersji + `TICKET_AGGREGATE` liczony z Jiry (Done / wszystkie).
+- [ ] **J-5** Pola własne: pobranie definicji (`/rest/api/3/field`), wybór przez admina,
+  zapis wartości (JSONB), wyświetlanie. **Czeka na listę pól od użytkownika.**
+- [ ] **J-6** Automatyczna synchronizacja co N minut.
+
+### Pytania otwarte
+- Pola własne: które i do czego (tylko wyświetlanie czy też filtrowanie/liczenie) — przed J-5.
+- J-6: mechanizm harmonogramu (timer w procesie aplikacji vs zewnętrzny cron) i interwał.
+
+---
+
+## Krok J-1 — Połączenie z Jira Cloud `[x]`
+
+- [x] Jira przeniesiona do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`
+- [x] `lib/jira/config.ts`, `lib/jira/client.ts`, akcja `testJiraConnection`
+- [x] `/admin/jira` + karta w panelu admina + okruszek
+- [x] `.env.example`, `docker-compose.yml`, testy
+
+### Decyzje
+- **Bez zmian schematu i bez nowych zależności.**
+- **`readJiraConfig(env)`** — czysta funkcja (env jako argument), `zod`: URL tylko `https://`,
+  końcowy `/` obcinany, poprawny e-mail. Trzy stany: `configured` / `missing` (lista zmiennych) / `invalid`.
+- **`jiraGet()`** — Basic auth (`email:token` base64), timeout 10 s (`AbortSignal.timeout`),
+  `redirect: 'manual'` (przekierowanie np. na stronę logowania = zły adres), wymagany
+  `content-type: application/json`. Błędy jako `JiraError` z rodzajem i **stałym** polskim komunikatem —
+  treść odpowiedzi Jiry nigdy nie jest przepisywana (nie wycieknie token ani dane). 429 dokleja `Retry-After`.
+  `fetch` wstrzykiwalny (testy bez sieci).
+- **Test połączenia = `GET /rest/api/3/myself`** — wynik: nazwa konta, adres, czas w ms.
+- **`testJiraConnection`** — `requireRole(['ADMIN'])`, bez wejścia od klienta (brak danych do `zod`),
+  bez mutacji → bez `ChangeLog`. Kształt `(prevState, formData)` pod `useActionState`.
+- **Strona `/admin/jira`** pokazuje adres i e-mail, token wyłącznie jako „ustawiony". Przycisk
+  wyłączony, gdy konfiguracja niepełna/niepoprawna.
+- **docker-compose:** `JIRA_*: ${JIRA_*:-}` — puste domyślne, brak konfiguracji nie blokuje startu
+  ani nie daje ostrzeżeń compose.
+
+### Odłożone
+- Paginacja (`nextPageToken`) i ponawianie przy 429 → J-3 (pierwsze realne użycie).
+- **Test na prawdziwej Jirze** — czeka na konto/token od użytkownika.
+
+### Jak sprawdzić
+- Bez `JIRA_*`: `/admin/jira` → „Nieskonfigurowane" + lista 3 zmiennych, przycisk wyłączony
+- Zmyślony token na prawdziwym adresie → „Nieprawidłowy e-mail lub token API (401)."
+- Prawdziwy token → „Połączono jako <konto> (<adres>) w N ms."
+- PM/TESTER: brak dostępu do `/admin/jira` (redirect), akcja odrzucona serwerowo
+
+**Zweryfikowane w tej sesji (przeglądarka + docker):**
+- `npx vitest run` → **50/50** (nowy `jira-client.test.ts` 14 testów; `authz.test.ts`: PM i TESTER
+  odrzuceni z `testJiraConnection`). `npm run check` czysto. `docker compose up -d --build` OK.
+- `/admin/jira` bez zmiennych → „Nieskonfigurowane", 3 brakujące zmienne.
+- Tymczasowo `JIRA_BASE_URL=https://jira.invalid` + zmyślony token (tylko w zmiennych powłoki,
+  `.env` nietknięty): konfiguracja pokazana, token jako „ustawiony", test →
+  „Błąd sieci — nie udało się połączyć z Jirą."; `docker compose logs app` — 0 wystąpień tokenu.
+  Kontener przywrócony bez zmiennych Jira, `/health` 200.
+- **Niezweryfikowane:** połączenie z prawdziwą Jirą (brak tokenu).
+
+---
+
+## Krok J-2 — Mapowanie aplikacji i wersji na Jirę `[x]`
+
+- [x] Migracja `20261028101500_jira_mapping`: `Application.jiraProjectKey @unique`,
+  `Version.jiraVersionId @unique` + `Version.jiraVersionName`
+- [x] Klucz projektu na ekranie edycji aplikacji (weryfikacja w Jirze)
+- [x] Sekcja „Jira" w edycji wersji (tylko ADMIN), wybór fixVersion z listy projektu
+- [x] Odpinanie przy zmianie aplikacji wersji, testy
+
+### Decyzje
+- **Jeden projekt Jira = jedna aplikacja** (`@unique` na `jiraProjectKey`, decyzja użytkownika).
+  **Jedna wersja Jira = najwyżej jedna wersja Release Hub** (`@unique` na `jiraVersionId`).
+  Konflikt → komunikat z nazwą aplikacji/wersji, która już używa projektu/wersji.
+- **Dwie osobne akcje ADMIN** w `app/actions/jira.ts`: `setApplicationJiraProject`,
+  `setVersionJiraVersion` — oddzielone od `updateApplication`/`updateVersion` (te drugie może
+  wołać TESTER, a zapytanie do Jiry nie powinno blokować zwykłej edycji).
+- **Klucz projektu:** `zod` (wielkie litery/cyfry/_, od litery, wielkość liter dowolna przy wpisie),
+  weryfikacja `GET /rest/api/3/project/{key}`, zapisywany klucz **kanoniczny z Jiry**. 404 →
+  „nie istnieje albo konto techniczne go nie widzi". Zmiana/odpięcie klucza **zablokowane**,
+  dopóki otwarte wersje aplikacji mają podpiętą wersję Jira (lista nazw w komunikacie).
+  Zamknięte wersje zachowują swoje podpięcie (historia).
+- **Wybór fixVersion:** lista `GET /rest/api/3/project/{key}/versions` pobierana przy renderze
+  strony edycji (tylko dla ADMIN). Pokazywane niewydane i niezarchiwizowane + aktualnie podpięta;
+  sortowanie po dacie wydania, potem nazwie (`lib/jira/versions.ts`). **Serwer ponownie pobiera
+  listę i sprawdza id** (nie ufa klientowi); wydana/zarchiwizowana → odmowa.
+- **Ponowny odczyt w transakcji** (status, projekt aplikacji) — zmiany w trakcie zapytania do Jiry
+  nie przejdą. Zmiana logowana w `ChangeLog` (`field: 'jiraVersion'`, nazwy wersji), etykieta
+  „wersja Jira" w logu zmian.
+- **Odpięcie działa bez Jiry** — gdy lista jest niedostępna, formularz pokazuje tylko aktualną
+  wersję i opcję „— niepodpięta —".
+- **Zmiana aplikacji wersji w `updateVersion`** czyści `jiraVersionId/Name` i loguje to w tej samej
+  transakcji (wersja Jira należy do projektu poprzedniej aplikacji).
+- **Migracja przez `prisma migrate diff` + `migrate deploy`** — `migrate dev` odmawia pracy w
+  nieinteraktywnym terminalu Claude'a. Nadal plik migracji w repo, nie `db push`.
+- `prisma format` wyrównał przy okazji białe znaki w modelu `User` (bez zmian treści).
+
+### Odłożone
+- Pokazanie podpiętej wersji Jira poza ekranem edycji (podgląd wersji, dashboard) → J-4.
+- Klucz projektu na liście aplikacji w panelu admina — niepotrzebny na razie.
+- **Test na prawdziwej Jirze** — czeka na token.
+
+### Jak sprawdzić
+- Bez `JIRA_*`: edycja aplikacji → sekcja „Jira" z informacją „nieskonfigurowana", pole wyłączone;
+  edycja wersji (ADMIN) → podpowiedź, co ustawić najpierw
+- TESTER: edycja wersji bez sekcji „Jira"; akcje mapowania odrzucone serwerowo
+- Z tokenem: klucz `abc` → zapisany jako `ABC`; nieistniejący klucz → komunikat; w edycji wersji
+  lista fixVersion; ta sama fixVersion na drugiej wersji → odmowa z nazwą pierwszej; zmiana aplikacji
+  wersji → podpięcie znika, wpis „wersja Jira" w logu zmian; zmiana klucza aplikacji z podpiętą
+  otwartą wersją → odmowa z listą wersji
+
+**Zweryfikowane w tej sesji (testy + przeglądarka + docker):**
+- `npx vitest run` → **64/64** (nowy `jira-mapping.test.ts`, 14 testów: filtr/sortowanie wersji,
+  walidacja, odmowa PM/TESTER w obu akcjach, blokada zmiany klucza, 404 projektu, kanoniczny klucz,
+  obca i wydana wersja odrzucone, zapis + `ChangeLog`, odpięcie bez Jiry, wersja zamknięta).
+- `npm run check` czysto; `docker compose up -d --build` → „No pending migrations", Ready.
+- Przeglądarka (bez `JIRA_*`): ADMIN — sekcja „Jira" w edycji aplikacji (nieskonfigurowana, pole
+  wyłączone) i w edycji wersji `04.01.150` (podpowiedź o kluczu projektu); TESTER — brak sekcji.
+- **Niezweryfikowane:** lista fixVersion i zapis mapowania na prawdziwej Jirze (brak tokenu).
+- Środowisko: Docker Desktop znów padł na martwym sockecie (`Docker\run`) — przeniesione na bok
+  (`*.broken-20261028-*`), zgodnie z wcześniejszą zgodą użytkownika.
+
+---
+
+## Backlog (po MVP)
+
+- **Rozbudowa kont, ról i uprawnień.** Na razie zostają 3 role (TESTER/PM/ADMIN), a integracją
+  Jira zarządza wyłącznie ADMIN. Później: bardziej granularne uprawnienia (np. kto może
+  synchronizować Jirę, zarządzać mapowaniem, katalogami) — do zaprojektowania osobno.
+
+---
+
 ## Krok 11 — SSE (opcjonalny, po MVP) `[ ]`
 
 - [ ] `NOTIFY` z server actions, klient `pg` z `LISTEN`

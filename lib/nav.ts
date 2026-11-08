@@ -31,6 +31,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   users: 'Konta',
   applications: 'Aplikacje',
   changelog: 'Log zmian',
+  jira: 'Jira',
   columns: 'Konfiguracja kroków',
   flows: 'Szablony',
   new: 'Nowa',

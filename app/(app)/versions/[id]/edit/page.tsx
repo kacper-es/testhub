@@ -15,6 +15,13 @@ import {
   AttachInstance,
   type AttachOption,
 } from '@/components/versions/AttachInstance'
+import {
+  VersionJiraForm,
+  type JiraVersionOption,
+} from '@/components/versions/VersionJiraForm'
+import { readJiraConfig } from '@/lib/jira/config'
+import { getProjectVersions, JiraError } from '@/lib/jira/client'
+import { selectableJiraVersions } from '@/lib/jira/versions'
 import { EditVersionForm } from './edit-version-form'
 
 export default async function EditVersionPage({
@@ -23,7 +30,7 @@ export default async function EditVersionPage({
   params: Promise<{ id: string }>
 }) {
   // Edycja wersji: TESTER/ADMIN (PM → redirect na /).
-  await requireRolePage(['TESTER', 'ADMIN'])
+  const user = await requireRolePage(['TESTER', 'ADMIN'])
   const { id } = await params
 
   const version = await prisma.version.findUnique({
@@ -34,13 +41,20 @@ export default async function EditVersionPage({
       releaseDate: true,
       status: true,
       applicationId: true,
-      application: { select: { id: true, name: true, isActive: true } },
+      jiraVersionId: true,
+      jiraVersionName: true,
+      application: {
+        select: { id: true, name: true, isActive: true, jiraProjectKey: true },
+      },
     },
   })
   if (!version) notFound()
 
   // Edycja tylko na otwartej wersji (read-only na zamkniętej, reguła 12).
   if (version.status !== 'IN_PROGRESS') redirect(`/versions/${id}`)
+
+  // Sekcja Jira tylko dla ADMIN (mapowanie zarządzane przez admina).
+  const jira = user.role === 'ADMIN' ? await loadJiraSection(version) : null
 
   const today = todayInWarsaw()
   const activeApps = await prisma.application.findMany({
@@ -207,6 +221,89 @@ export default async function EditVersionPage({
 
         <AttachInstance versionId={version.id} options={attachOptions} />
       </section>
+
+      {jira && (
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Jira</h2>
+            <p className="mt-1 text-sm text-muted">
+              Wersja Jira (fixVersion), z której będą pobierane tickety. Widoczne tylko dla
+              administratora.
+            </p>
+          </div>
+
+          {version.jiraVersionName && (
+            <p className="text-sm">
+              Podpięta: <span className="font-mono">{version.jiraVersionName}</span>
+            </p>
+          )}
+
+          {jira.status === 'hint' && <p className="text-sm text-muted">{jira.message}</p>}
+          {jira.status === 'error' && (
+            <p role="alert" className="text-sm text-fail-strong">
+              {jira.message}
+            </p>
+          )}
+          {/* Odpięcie musi działać także, gdy lista z Jiry jest niedostępna. */}
+          {(jira.status === 'ready' || version.jiraVersionId) && (
+            <VersionJiraForm
+              versionId={version.id}
+              currentId={version.jiraVersionId}
+              options={
+                jira.status === 'ready'
+                  ? jira.options
+                  : [{ id: version.jiraVersionId!, label: version.jiraVersionName ?? '' }]
+              }
+            />
+          )}
+        </section>
+      )}
     </main>
   )
+}
+
+type JiraSection =
+  | { status: 'hint' | 'error'; message: string }
+  | { status: 'ready'; options: JiraVersionOption[] }
+
+async function loadJiraSection(version: {
+  jiraVersionId: string | null
+  application: { jiraProjectKey: string | null } | null
+}): Promise<JiraSection> {
+  if (!version.application) {
+    return { status: 'hint', message: 'Najpierw wybierz aplikację wersji.' }
+  }
+  const projectKey = version.application.jiraProjectKey
+  if (!projectKey) {
+    return {
+      status: 'hint',
+      message: 'Aplikacja nie jest podpięta do projektu Jira — ustaw klucz w Panel administratora → Aplikacje.',
+    }
+  }
+  const cfg = readJiraConfig()
+  if (cfg.status !== 'configured') {
+    return { status: 'hint', message: 'Jira nieskonfigurowana — szczegóły w Panel administratora → Jira.' }
+  }
+  try {
+    const versions = selectableJiraVersions(
+      await getProjectVersions(cfg.config, projectKey),
+      version.jiraVersionId,
+    )
+    return {
+      status: 'ready',
+      options: versions.map((v) => ({
+        id: v.id,
+        label: [
+          v.name,
+          v.releaseDate ? `(${v.releaseDate})` : null,
+          v.released ? '— wydana' : v.archived ? '— zarchiwizowana' : null,
+        ]
+          .filter(Boolean)
+          .join(' '),
+      })),
+    }
+  } catch (err) {
+    const message = err instanceof JiraError ? err.message : 'Nieoczekiwany błąd Jiry.'
+    return { status: 'error', message: `Nie udało się pobrać wersji z Jiry: ${message}` }
+  }
 }

@@ -27,16 +27,20 @@ Zastępuje dwa arkusze Excel:
 1. Katalog instancji/środowisk z ich kluczowymi funkcjonalnościami → model `Instance`
 2. Lista instancji z postępem testów (4 flagi) → model `InstanceTestRun`
 
+### Integracja Jira (po MVP, read-only, Cloud)
+
+Zakres i kroki J-1…J-6: `PROGRESS.md`, sekcja „Integracja Jira". Wyłącznie odczyt z Jira Cloud
+(REST API v3), sekrety tylko w env, zarządza wyłącznie ADMIN.
+
 ### Poza zakresem MVP — nie buduj rusztowania
 
-- integracja z Jira API (przyszły etap, read-only)
 - baza wiedzy / dokumentacja procesów
 - powiadomienia email i Slack
 - reset hasła mailem (brak SMTP)
 - kopie zapasowe (będzie `pg_dump` z volume'a, poza aplikacją)
 - eksport do PDF/Excel
 
-Nie zostawiaj pustych folderów, interfejsów ani „TODO: Jira" pod te funkcje.
+Nie zostawiaj pustych folderów, interfejsów ani komentarzy „TODO" pod te funkcje.
 
 ---
 

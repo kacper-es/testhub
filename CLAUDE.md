@@ -36,9 +36,13 @@ Nie łam ich bez zapytania mnie:
 - Animacje respektują `prefers-reduced-motion: reduce`.
 - Kontrast: min. 4,5:1 dla tekstu, 3:1 dla elementów UI, w obu motywach.
 
+## Integracja Jira (po MVP)
+
+Read-only, Jira Cloud (REST API v3), kroki J-1…J-6 w `PROGRESS.md`. Sekrety (`JIRA_*`) wyłącznie w env — nigdy w bazie, logach, odpowiedziach do klienta ani komunikatach błędów. Zarządza tylko ADMIN. Nie buduj z wyprzedzeniem kodu z kolejnych kroków J.
+
 ## Poza zakresem MVP
 
-Jira API, baza wiedzy, powiadomienia email/Slack, reset hasła mailem, eksport PDF/Excel, kopie zapasowe w aplikacji. **Nie buduj rusztowania pod te funkcje** — żadnych pustych folderów, interfejsów ani komentarzy „TODO: Jira".
+Baza wiedzy, powiadomienia email/Slack, reset hasła mailem, eksport PDF/Excel, kopie zapasowe w aplikacji. **Nie buduj rusztowania pod te funkcje** — żadnych pustych folderów, interfejsów ani komentarzy „TODO".
 
 SSE + `LISTEN/NOTIFY` to krok 11, po MVP. W MVP polling co 5 s.
 

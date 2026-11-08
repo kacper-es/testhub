@@ -1,4 +1,7 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { readJiraConfig } from '@/lib/jira/config'
+import { ApplicationJiraForm } from '@/components/admin/ApplicationJiraForm'
 import { prisma } from '@/lib/prisma'
 import { requireRolePage } from '@/lib/auth/authz'
 import {
@@ -26,9 +29,12 @@ export default async function EditApplicationPage({
       sortOrder: true,
       iconType: true,
       iconUpdatedAt: true,
+      jiraProjectKey: true,
     },
   })
   if (!app) notFound()
+
+  const jiraConfigured = readJiraConfig().status === 'configured'
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-8 p-6">
@@ -45,6 +51,24 @@ export default async function EditApplicationPage({
           sortOrder: app.sortOrder,
         }}
       />
+
+      <section className="flex flex-col gap-3 border-t border-border pt-6">
+        <h2 className="text-lg font-semibold">Jira</h2>
+        {!jiraConfigured && (
+          <p className="text-sm text-muted">
+            Jira nieskonfigurowana — szczegóły w{' '}
+            <Link href="/admin/jira" className="underline">
+              Panel administratora → Jira
+            </Link>
+            .
+          </p>
+        )}
+        <ApplicationJiraForm
+          applicationId={app.id}
+          projectKey={app.jiraProjectKey}
+          disabled={!jiraConfigured}
+        />
+      </section>
 
       <section className="flex flex-col gap-3 border-t border-border pt-6">
         <h2 className="text-lg font-semibold">Ikona</h2>

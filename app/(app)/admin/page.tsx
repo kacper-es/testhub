@@ -32,6 +32,11 @@ export default async function AdminPage() {
       desc: 'Tworzenie kont z hasłem tymczasowym, reset hasła, rola, dezaktywacja.',
     },
     {
+      href: '/admin/jira',
+      title: 'Jira',
+      desc: 'Połączenie z Jira Cloud (tylko odczyt): stan konfiguracji i test połączenia.',
+    },
+    {
       href: '/admin/changelog',
       title: 'Log zmian',
       desc: 'Historia zmian flag i zadań z filtrami i paginacją.',
