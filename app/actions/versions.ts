@@ -9,8 +9,10 @@ import { assertVersionEditable } from '@/lib/versions/guard'
 import { logChange, type LogChangeInput } from '@/lib/versions/log-change'
 import { toDateOnly } from '@/lib/versions/deadline'
 import {
+  addVersionTasksSchema,
   cancelVersionSchema,
   createVersionSchema,
+  deleteVersionSchema,
   updateVersionSchema,
 } from '@/lib/validation/version'
 
@@ -332,4 +334,103 @@ export async function updateVersion(
   revalidatePath('/')
   revalidatePath('/archive')
   redirect(`/versions/${versionId}`)
+}
+
+// "Add task from template" (rule 6): the task set is frozen at creation (rule 5);
+// this is the escape hatch for templates created later. Open versions only.
+// Empty templateId = every active template missing from the version.
+// No ChangeLog entry — rule 27 does not cover it (same as attaching an instance).
+export async function addVersionTasks(formData: FormData): Promise<void> {
+  await requireRole(['TESTER', 'ADMIN'])
+  const parsed = addVersionTasksSchema.safeParse({
+    versionId: formData.get('versionId'),
+    templateId: formData.get('templateId') ?? '',
+  })
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane')
+  }
+  const { versionId, templateId } = parsed.data
+
+  await prisma.$transaction(async (tx) => {
+    const version = await tx.version.findUnique({
+      where: { id: versionId },
+      select: { status: true },
+    })
+    if (!version) throw new Error('Nie znaleziono wersji')
+    assertVersionEditable(version.status)
+
+    const missing = await tx.taskTemplate.findMany({
+      where: {
+        isActive: true,
+        ...(templateId ? { id: templateId } : {}),
+        versionTasks: { none: { versionId } },
+      },
+      select: { id: true },
+    })
+    if (templateId && missing.length === 0) {
+      throw new Error('Szablon jest nieaktywny albo już jest w tej wersji')
+    }
+    if (missing.length === 0) return
+
+    await tx.versionTask.createMany({
+      data: missing.map((t) => ({ versionId, taskTemplateId: t.id })),
+      skipDuplicates: true,
+    })
+  })
+
+  revalidatePath(`/versions/${versionId}`)
+  revalidatePath(`/versions/${versionId}/edit`)
+  revalidatePath('/')
+}
+
+export type DeleteVersionState = { error?: string }
+
+// Permanent delete — the only hard delete besides Session (CLAUDE.md exception).
+// ADMIN only, confirmed by typing the version name. Tasks, instance runs (with
+// notes), comments and version columns go with it (onDelete: Cascade). The
+// ChangeLog entry is written first in the same transaction; ChangeLog has no FK
+// to Version, so older entries of this version stay.
+export async function deleteVersion(
+  _prev: DeleteVersionState,
+  formData: FormData,
+): Promise<DeleteVersionState> {
+  const user = await requireRole(['ADMIN'])
+  const parsed = deleteVersionSchema.safeParse({
+    versionId: formData.get('versionId'),
+    confirmName: formData.get('confirmName'),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane' }
+  }
+  const { versionId, confirmName } = parsed.data
+
+  const result = await prisma.$transaction(async (tx) => {
+    const version = await tx.version.findUnique({
+      where: { id: versionId },
+      select: { name: true },
+    })
+    if (!version) return { error: 'Nie znaleziono wersji' }
+    if (confirmName !== version.name) {
+      return { error: 'Nazwa nie zgadza się z nazwą wersji' }
+    }
+
+    await logChange(tx, {
+      entityType: 'Version',
+      entityId: versionId,
+      versionId: null,
+      field: 'deleted',
+      oldValue: version.name,
+      newValue: null,
+      userId: user.id,
+    })
+    await tx.version.delete({ where: { id: versionId } })
+    return null
+  })
+  if (result) return result
+
+  revalidatePath('/versions')
+  revalidatePath('/')
+  revalidatePath('/archive')
+  revalidatePath('/admin/changelog')
+  redirect('/versions')
 }

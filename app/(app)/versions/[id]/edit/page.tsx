@@ -19,6 +19,7 @@ import {
   VersionJiraForm,
   type JiraVersionOption,
 } from '@/components/versions/VersionJiraForm'
+import { AddVersionTasks } from '@/components/versions/AddVersionTasks'
 import { readJiraConfig } from '@/lib/jira/config'
 import { getProjectVersions, JiraError } from '@/lib/jira/client'
 import { selectableJiraVersions } from '@/lib/jira/versions'
@@ -120,6 +121,16 @@ export default async function EditVersionPage({
     })
     .map((i) => ({ id: i.id, name: i.name, hadData: runByInstanceId.has(i.id) }))
 
+  // Zadania (reguła 6): aktywne szablony nieobecne w wersji — do dołożenia.
+  const [taskCount, missingTemplates] = await Promise.all([
+    prisma.versionTask.count({ where: { versionId: id } }),
+    prisma.taskTemplate.findMany({
+      where: { isActive: true, versionTasks: { none: { versionId: id } } },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true },
+    }),
+  ])
+
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
       <div>
@@ -188,6 +199,17 @@ export default async function EditVersionPage({
             </div>
           </form>
         )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Zadania</h2>
+          <p className="mt-1 text-sm text-muted">
+            Zestaw zadań powstaje przy tworzeniu wersji ({taskCount} w tej wersji). Szablony
+            dodane później można dołożyć tutaj.
+          </p>
+        </div>
+        <AddVersionTasks versionId={version.id} missing={missingTemplates} />
       </section>
 
       <section className="flex flex-col gap-3">

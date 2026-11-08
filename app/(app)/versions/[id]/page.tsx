@@ -21,6 +21,7 @@ import {
   type LastChangeMap,
 } from '@/components/versions/InstanceRunsTable'
 import { CommentForm } from '@/components/versions/CommentForm'
+import { DeleteVersion } from '@/components/versions/DeleteVersion'
 import Link from 'next/link'
 import { AppIcon } from '@/components/versions/AppIcon'
 import { Button } from '@/components/ui/Button'
@@ -341,6 +342,19 @@ export default async function VersionDetailPage({
           </ul>
         )}
       </section>
+
+      {user.role === 'ADMIN' && (
+        <section className="flex flex-col gap-3 rounded-lg border border-fail-strong p-4">
+          <div>
+            <h2 className="text-lg font-semibold">Usuń wersję</h2>
+            <p className="mt-1 text-sm text-muted">
+              Usuwa wersję na stałe razem z zadaniami, instancjami, notatkami, komentarzami
+              i krokami. Tej operacji nie można cofnąć. W logu zmian zostanie wpis o usunięciu.
+            </p>
+          </div>
+          <DeleteVersion versionId={version.id} versionName={version.name} />
+        </section>
+      )}
     </main>
   )
 }

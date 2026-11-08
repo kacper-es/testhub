@@ -26,6 +26,7 @@ const FIELD_LABEL: Record<string, string> = {
   name: 'nazwa',
   releaseDate: 'data wydania',
   jiraVersion: 'wersja Jira',
+  deleted: 'usunięcie wersji',
 }
 
 const fmt = new Intl.DateTimeFormat('pl-PL', {
@@ -232,7 +233,7 @@ export default async function ChangelogPage({
                     {ENTITY_LABEL[e.entityType] ?? e.entityType}
                   </td>
                   <td className="px-3 py-2 font-mono text-xs">
-                    {e.versionId ? (versionName.get(e.versionId) ?? '—') : '—'}
+                    {e.versionId ? (versionName.get(e.versionId) ?? '(usunięta)') : '—'}
                   </td>
                   <td className="px-3 py-2">
                     {fieldLabel(e.field)}

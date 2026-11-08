@@ -33,6 +33,23 @@ export const updateVersionSchema = z.object({
     .nullable(),
 })
 
+// Dodanie zadań z szablonów do istniejącej wersji (reguła 6).
+// Puste templateId = wszystkie brakujące aktywne szablony.
+export const addVersionTasksSchema = z.object({
+  versionId: z.string().min(1),
+  templateId: z
+    .string()
+    .trim()
+    .transform((v) => (v === '' ? null : v))
+    .nullable(),
+})
+
+// Trwałe usunięcie wersji (ADMIN) — potwierdzenie przez wpisanie nazwy.
+export const deleteVersionSchema = z.object({
+  versionId: z.string().min(1),
+  confirmName: z.string().trim().min(1, 'Wpisz nazwę wersji, aby potwierdzić'),
+})
+
 export const cancelVersionSchema = z.object({
   versionId: z.string().min(1),
   reason: z.string().trim().min(1, 'Podaj powód anulowania'),

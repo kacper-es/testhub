@@ -346,7 +346,7 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 
 ### Odłożone
 - „Dodaj zadanie z szablonu" (furtka reguła 6) — mutacja spoza logiki 3 typów; do rozważenia
-  przy panelu admina/szablonach (krok 9) lub osobno.
+  przy panelu admina/szablonach (krok 9) lub osobno. → Zrobione w kroku V-1 (2026-11-08).
 - Widok wersji rozwijany w 6b (instancje) i 6c (komentarze) — ten sam plik `/versions/[id]`.
 
 ### Jak sprawdzić
@@ -1235,6 +1235,8 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 - [x] **D-1b Publiczny obraz** — `LICENSE` (MIT), GitHub Actions → `ghcr.io` przy tagu `v*`
   (szczegóły niżej). Upublicznienie repo i pakietu robi użytkownik.
 - [x] **D-1c Stack pod Swarma** — `docker-stack.yml` + README (szczegóły niżej).
+- [x] **D-1d Po pierwszym wdrożeniu** — przypięcie `app` do noda + ostrzeżenie o HTTP
+  przy `secure` cookie (szczegóły niżej).
 - Backlog: dedykowany endpoint zdrowia z kodem 503 przy błędzie bazy (healthcheck nie musiałby
   parsować HTML); Swarm secrets (`*_FILE`) zamiast zmiennych z hasłami.
 - Backlog uniwersalności: obraz `linux/arm64`, README po angielsku, i18n UI, wstęp `CLAUDE.md` („Wewnętrzna aplikacja
@@ -1289,11 +1291,29 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 - **README:** HAProxy — backend na dowolny nod, TLS na proxy, `X-Forwarded-Proto: https`,
   **bez przepisywania `Host`** (Server Actions porównują `Origin` z `Host`), `COOKIE_SECURE` puste.
 
+- **D-1d — przypięcie `app`** (prośba użytkownika): `node.labels.releasehub.app == true`, osobna
+  etykieta (może być na tym samym nodzie co `releasehub.db`); etykiety bazy nie zmieniano, żeby
+  nie zatrzymać działającej bazy. Kolejność przy działającym stacku: etykieta → redeploy.
+- **D-1d — ostrzeżenie o HTTP.** Zgłoszenie z produkcji: zmiana hasła „nie działa" (powrót na
+  `/login` bez komunikatu, `mustChangePassword` bez zmian). Przyczyna: strona po `http://`,
+  cookie `secure` odrzucane przez przeglądarkę; ekran zmiany hasła i tak się pokazuje, bo Next
+  renderuje cel `redirect()` z akcji logowania w tej samej odpowiedzi (z cookie ustawionym
+  w akcji), a dopiero kolejny POST idzie bez cookie → middleware → `/login`.
+  Czysta funkcja `secureCookieWillBeDropped(url, secure)` (`lib/auth/insecure-origin.ts`,
+  bez zależności): `http:` + `secure` → true; `localhost`/`127.0.0.1`/`[::1]`/`*.localhost`
+  zwolnione (przeglądarki akceptują tam `Secure`). Użycie: (1) formularz logowania sprawdza
+  `window.location.href` po zamontowaniu (protokół zna tylko przeglądarka; proxy przed aplikacją)
+  i pokazuje komunikat (`role="alert"`, tokeny `text-warn-strong`); (2) akcja `login` po
+  udanym logowaniu sprawdza nagłówek `Origin` i loguje `console.warn` (bez danych użytkownika).
+
 ### Pytania otwarte
 - Kopia zapasowa bazy (`pg_dump` z crona na nodzie z etykietą) — poza aplikacją, ktoś musi ją ustawić.
 
 ### Jak sprawdzić
-- Stack bez etykiety noda → `db` „no suitable node"; po etykiecie `db` 1/1, `app` 1/1 i healthy
+- Stack bez etykiet nodów → `db` i `app` „no suitable node"; po etykietach `releasehub.db`
+  i `releasehub.app` → `db` 1/1, `app` 1/1 i healthy
+- `http://<nod>:3000/login` przy pustym `COOKIE_SECURE` → ostrzeżenie o HTTP na ekranie
+  i „Login from http://… over plain HTTP" w logach po zalogowaniu; przez `https://` → brak
 - `https://<adres z HAProxy>/health` → „Baza: OK"; port `5432` niedostępny z innej maszyny
 - Pusta baza → w logach `app` „Created initial admin account admin@example.com…";
   logowanie `admin@example.com` / `admin` → wymuszona zmiana hasła → dashboard;
@@ -1339,11 +1359,95 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
     `app` healthy po 15 s, dane zachowane (1 konto w bazie);
   - sprzątanie: `docker stack rm`, wolumen testowy usunięty, `docker swarm leave --force`,
     obraz testowy usunięty, lokalny stack compose wznowiony.
+- **D-1d:** `npm run check` czysto; `npx vitest run` → **79/79** (nowy `insecure-origin.test.ts`,
+  5 testów). Lokalny Swarm, `COOKIE_SECURE` puste: tylko etykieta `db` → `app` Pending
+  „no suitable node"; po `releasehub.app` → healthy po 15 s. Przeglądarka na
+  `http://192.168.8.178:3000/login` (adres LAN) → ostrzeżenie widoczne; logowanie →
+  `/change-password`, `document.cookie` puste; zmiana hasła → `/login` bez komunikatu,
+  w bazie `mustChangePassword = t` (problem z produkcji odtworzony 1:1); w logach `app`
+  „Login from http://192.168.8.178:3000 over plain HTTP…". `http://localhost:3000/login` →
+  brak ostrzeżenia. Sprzątanie jak w D-1c, lokalny compose wznowiony.
 - **Niezweryfikowane (D-1c):** wielowęzłowy Swarm (przypięcie bazy do innego noda niż app),
   Portainer i HAProxy z HTTPS — dopiero przy wdrożeniu u użytkownika.
 - Środowisko: Docker Desktop nie wstawał (martwe sockety w `%LOCALAPPDATA%\Docker\run`
   i `%LOCALAPPDATA%\docker-secrets-engine`, przeniesione na bok jako `*.broken-20261108-*`
   za zgodą użytkownika); naprawił dopiero restart Windows — przy kolejnej awarii zacząć od restartu.
+
+---
+
+## Krok V-1 — „Dodaj zadanie z szablonu" (reguła 6) `[x]`
+
+Zgłoszenie z produkcji (2026-11-08): wersja utworzona przed szablonami zadań — nie było jak
+dołożyć zadań. Furtka z reguły 6 specyfikacji odłożona w 6a i nigdy niezbudowana.
+
+- [x] Akcja `addVersionTasks` + `addVersionTasksSchema`
+- [x] Sekcja „Zadania" na ekranie edycji wersji (`AddVersionTasks`)
+
+### Decyzje
+- **Na ekranie edycji** (`/versions/[id]/edit`), obok „Kroki wersji" i „Instancje" — zmiany
+  struktury wersji są tam od UI-5. Select „Dodaj zadanie z szablonu" + **„Dodaj wszystkie
+  brakujące (N)"** (przypadek ze zgłoszenia). Pusty stan: „Wszystkie aktywne szablony są już
+  w tej wersji". Formularze server action bez JS klienta (jak `AttachInstance`).
+- **`addVersionTasks`**: TESTER/ADMIN, `zod` (puste `templateId` = wszystkie brakujące); w transakcji
+  odczyt statusu → `assertVersionEditable` (tylko `IN_PROGRESS`), aktywne szablony bez
+  `VersionTask` w tej wersji, `createMany` z `skipDuplicates`. Wybrany szablon nieaktywny/już
+  obecny → błąd. Bez `ChangeLog` (reguła 27 go nie obejmuje — jak „Podepnij instancję").
+- Lista brakujących szablonów czyta `TaskTemplate.name` — to katalog, nie efektywne wartości
+  zadania wersji, więc `resolveTask` nie dotyczy.
+
+### Jak sprawdzić
+- Wersja bez części zadań → edycja → „Zadania": select z brakującymi + „Dodaj wszystkie (N)";
+  dodanie jednego → N−1; „Dodaj wszystkie" → „Wszystkie aktywne szablony są już w tej wersji";
+  podgląd wersji pokazuje nowe zadania z terminami
+- PM: akcja odrzucona serwerowo; wersja zamknięta: odrzucona (edycja i tak przekierowuje)
+
+---
+
+## Krok V-2 — Trwałe usuwanie wersji `[x]`
+
+Prośba użytkownika (2026-11-08): usuwanie wersji jest potrzebne (np. wersja testowa, nazwa
+zablokowana przez `@unique` także po anulowaniu). Świadomy wyjątek od „Zero hard delete".
+
+- [x] Akcja `deleteVersion` + `deleteVersionSchema`
+- [x] Sekcja „Usuń wersję" w podglądzie wersji (`DeleteVersion`, tylko ADMIN)
+- [x] Etykieta „usunięcie wersji" i „(usunięta)" w logu zmian
+- [x] Wyjątek w `CLAUDE.md` i w specyfikacji (sekcja integralności)
+
+### Decyzje
+- **Miejsce: dół podglądu wersji**, nie ekran edycji (jak planowano) — edycja przekierowuje
+  wersje zamknięte, a usuwać trzeba też anulowane/wydane. Widoczne tylko dla ADMIN, każdy status.
+  Ramka `border-fail-strong`, przycisk `danger`.
+- **Potwierdzenie nazwą:** przycisk aktywny po wpisaniu dokładnej nazwy (klient), serwer
+  porównuje ponownie (po `trim`). Niezgodność → komunikat, nic nie usunięte.
+- **`deleteVersion`**: `requireRole(['ADMIN'])`, `zod`; w jednej transakcji: odczyt nazwy →
+  `logChange` (`entityType: 'Version'`, `field: 'deleted'`, `oldValue` = nazwa, `versionId: null`)
+  → `version.delete`. Zadania, runy instancji (z notatkami i wartościami), komentarze i kroki
+  wersji znikają kaskadą (`onDelete: Cascade` w schemacie — bez zmian schematu). `ChangeLog` nie
+  ma FK do `Version`, więc starsze wpisy zostają; w logu zmian kolumna wersji pokazuje dla nich
+  „(usunięta)". Zwolnione: nazwa (`@unique`) i ewentualna wersja Jira (`jiraVersionId @unique`).
+- Przekierowanie na `/versions`, `revalidatePath` dla list, dashboardu, archiwum i logu zmian.
+
+### Jak sprawdzić
+- ADMIN, podgląd dowolnej wersji → „Usuń wersję"; niepełna nazwa → przycisk nieaktywny;
+  pełna → usunięcie, przekierowanie na `/versions`
+- Log zmian: „usunięcie wersji · <nazwa> → —"; starsze wpisy tej wersji z „(usunięta)"
+- Nowa wersja o tej samej nazwie tworzy się bez błędu
+- TESTER/PM: brak sekcji; akcja odrzucona serwerowo
+
+**Zweryfikowane w tej sesji (V-1 + V-2):**
+- `npm run check` czysto; `npx vitest run` → **87/87** (nowy `version-structure.test.ts`, 8 testów:
+  V-1 — odmowa PM, wersja zamknięta, „dodaj wszystkie" = tylko aktywne brakujące + `skipDuplicates`,
+  pojedynczy nieaktywny/obecny → błąd; V-2 — odmowa PM i TESTER, niezgodna nazwa → nic,
+  zgodna → `ChangeLog` + `delete` + redirect).
+- Docker (`docker compose up -d --build`) + przeglądarka jako ADMIN: wersja `V-TEST-1` (6 zadań),
+  3 zadania usunięte w SQL (symulacja szablonów dodanych później) → „Dodaj wszystkie brakujące (3)";
+  dodanie jednego → (2), 4 zadania; „Dodaj wszystkie" → 6 zadań, pusty stan; podgląd: 6 zadań
+  z terminami. Przed usunięciem dodany komentarz i wpis `ChangeLog` (SQL). „V-TEST" → przycisk
+  nieaktywny, „V-TEST-1" → aktywny; usunięcie → `/versions`; w bazie 0 wersji/zadań/runów/
+  komentarzy/kroków; log zmian: „usunięcie wersji V-TEST-1 → —" i „(usunięta) data wydania…";
+  ponowne utworzenie `V-TEST-1` bez błędu. Dane testowe usunięte z lokalnej bazy.
+- **Niezweryfikowane w przeglądarce:** widok TESTER/PM (brak sekcji) — pokryte testami akcji
+  i warunkiem `user.role === 'ADMIN'` w stronie.
 
 ---
 

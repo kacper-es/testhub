@@ -1,7 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
 import { hashPassword, verifyPassword } from '@/lib/auth/password'
 import {
@@ -18,6 +18,7 @@ import {
 import { changePasswordSchema, loginSchema } from '@/lib/validation/auth'
 import { THEME_COOKIE } from '@/lib/theme'
 import { cookieSecure } from '@/lib/auth/cookie'
+import { secureCookieWillBeDropped } from '@/lib/auth/insecure-origin'
 
 export type LoginState = { error?: string }
 export type ChangePasswordState = { error?: string }
@@ -58,6 +59,17 @@ export async function login(
 
   resetAttempts(email)
   await createSession(user.id)
+
+  // The browser's Origin tells how the page was opened (a proxy in front
+  // doesn't change it). Over plain HTTP the Secure cookie set above is dropped.
+  const origin = (await headers()).get('origin')
+  if (secureCookieWillBeDropped(origin, cookieSecure())) {
+    console.warn(
+      `Login from ${origin} over plain HTTP: the browser will drop the secure session ` +
+        'cookie and the user will be sent back to /login. Serve the app over HTTPS ' +
+        'or set COOKIE_SECURE=false.',
+    )
+  }
 
   // Mirror preferencji motywu (User.theme = źródło prawdy) do cookie czytanego
   // w server layoucie — brak mrugnięcia po zalogowaniu.

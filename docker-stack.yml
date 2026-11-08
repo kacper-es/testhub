@@ -1,9 +1,10 @@
 # Release Hub — stack for Docker Swarm (Portainer: Stacks → Add stack).
 # Local development uses docker-compose.yml (builds the image, exposes 5432).
 #
-# Before the first deploy, label the node that will hold the database volume:
-#   docker node update --label-add releasehub.db=true <node>
-# (Portainer: Swarm → node → Labels). Without the label `db` stays pending.
+# Before the first deploy, label the nodes (Portainer: Swarm → node → Labels):
+#   docker node update --label-add releasehub.db=true <node>    # database volume
+#   docker node update --label-add releasehub.app=true <node>   # application
+# Both labels may go on the same node. Without a label the service stays pending.
 
 services:
   db:
@@ -58,6 +59,10 @@ services:
       start_period: 60s
     deploy:
       replicas: 1
+      placement:
+        # Keep the app on a chosen node (it may be the same one as the database).
+        constraints:
+          - node.labels.releasehub.app == true
       restart_policy:
         condition: any
         delay: 5s

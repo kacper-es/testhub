@@ -19,7 +19,7 @@ npx vitest run                         # testy
 Nie łam ich bez zapytania mnie:
 
 - **Autoryzacja wyłącznie przez `requireRole()` po stronie serwera**, w każdej server action i route handlerze. Ukrycie przycisku nie jest autoryzacją.
-- **Zero hard delete.** Dezaktywacja przez `isActive`, odpinanie instancji przez `excludedAt`. Wyjątek: `Session`.
+- **Zero hard delete.** Dezaktywacja przez `isActive`, odpinanie instancji przez `excludedAt`. Wyjątki: `Session` oraz `Version` — wyłącznie przez akcję `deleteVersion` (ADMIN, potwierdzenie nazwą, wpis w `ChangeLog`).
 - **Zero surowych kolorów Tailwinda** (`gray-*`, `green-*`, `red-*`) w komponentach — tylko tokeny CSS variables.
 - **Nigdy `prisma db push`** — tylko migracje.
 - Efektywne wartości zadania czytaj tylko przez `resolveTask()`, nigdy `template.name` w komponencie.

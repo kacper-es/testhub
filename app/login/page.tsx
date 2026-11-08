@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSessionUser } from '@/lib/auth/session'
+import { cookieSecure } from '@/lib/auth/cookie'
 import { LoginForm } from './login-form'
 
 export default async function LoginPage({
@@ -11,5 +12,5 @@ export default async function LoginPage({
   if (user) redirect(user.mustChangePassword ? '/change-password' : '/')
 
   const { changed } = await searchParams
-  return <LoginForm changed={changed === '1'} />
+  return <LoginForm changed={changed === '1'} secureCookies={cookieSecure()} />
 }

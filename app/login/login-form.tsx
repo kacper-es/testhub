@@ -1,15 +1,28 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { login, type LoginState } from '@/app/actions/auth'
+import { secureCookieWillBeDropped } from '@/lib/auth/insecure-origin'
 import { Button } from '@/components/ui/Button'
 import { Field, Input } from '@/components/ui/Input'
 import { Wordmark } from '@/components/Wordmark'
 
 const initial: LoginState = {}
 
-export function LoginForm({ changed }: { changed: boolean }) {
+export function LoginForm({
+  changed,
+  secureCookies,
+}: {
+  changed: boolean
+  secureCookies: boolean
+}) {
   const [state, action, pending] = useActionState(login, initial)
+  // Only the browser knows the real protocol (a proxy may sit in front), so
+  // check after mount — no hydration mismatch.
+  const [insecure, setInsecure] = useState(false)
+  useEffect(() => {
+    setInsecure(secureCookieWillBeDropped(window.location.href, secureCookies))
+  }, [secureCookies])
 
   return (
     <main className="grid min-h-screen place-items-center bg-bg px-4 py-10">
@@ -21,6 +34,17 @@ export function LoginForm({ changed }: { changed: boolean }) {
           <p className="mb-5 text-sm text-muted">
             Zaloguj się firmowym adresem email.
           </p>
+
+          {insecure && (
+            <p
+              role="alert"
+              className="mb-4 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-warn-strong"
+            >
+              Strona jest otwarta przez HTTP, a ciasteczko sesji wymaga HTTPS — logowanie nie
+              zadziała. Otwórz ją adresem <code>https://</code> albo ustaw{' '}
+              <code>COOKIE_SECURE=false</code>.
+            </p>
+          )}
 
           {changed && (
             <p

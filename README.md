@@ -12,7 +12,7 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)
-![tests](https://img.shields.io/badge/testy-74%20passing-3B6D11?style=flat-square)
+![tests](https://img.shields.io/badge/testy-87%20passing-3B6D11?style=flat-square)
 
 [Specyfikacja](PROMPT-release-hub-mvp.md) ·
 [Reguły projektu](CLAUDE.md) ·
@@ -29,7 +29,7 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 | 📋 **Dashboard** | Wersje w przygotowaniu z odliczaniem do wydania, postępem i gotowością instancji |
 | ✅ **Checklista wersji** | Trzy typy zadań (checkbox, licznik zgłoszeń, agregat instancji) z deadline'ami i progami pilności |
 | 🖥️ **Instancje testowe** | Tabela środowisk z konfigurowalnymi krokami (kolumnami) gotowości, notatkami i podpinaniem/odpinaniem |
-| ✏️ **Edycja wersji** | Osobny ekran: zmiana nazwy, daty wydania, aplikacji i kroków wersji (terminy się przesuwają) |
+| ✏️ **Edycja wersji** | Osobny ekran: zmiana nazwy, daty wydania, aplikacji, kroków i zadań wersji (dokładanie szablonów dodanych później) |
 | 🗄️ **Archiwum** | Wersje wydane i anulowane z powodem i filtrami |
 | 🛠️ **Panel admina** | Szablony zadań, aplikacje (z ikonami), katalog instancji, kroki i szablony (flow), konta, log zmian |
 | 🔗 **Jira Cloud** | Read-only: test połączenia, mapowanie aplikacji na projekt i wersji na fixVersion (ADMIN) |
@@ -73,13 +73,16 @@ Produkcja używa gotowego obrazu z `ghcr.io` i pliku [`docker-stack.yml`](docker
 (`docker-compose.yml` służy tylko do lokalnego rozwoju — buduje obraz i wystawia port bazy).
 Ten sam plik działa też jako zwykły stack compose w Portainerze bez Swarma.
 
-1. **Etykieta noda pod bazę** (raz). Wolumen Postgresa jest lokalny dla noda, więc baza
-   jest przypięta do noda z etykietą — Portainer: **Swarm → nod → Labels**
-   (`releasehub.db` = `true`) albo:
+1. **Etykiety nodów** (raz). Baza i aplikacja są przypięte do nodów z etykietami
+   (wolumen Postgresa jest lokalny dla noda) — Portainer: **Swarm → nod → Labels**
+   (`releasehub.db` = `true`, `releasehub.app` = `true`) albo:
    ```bash
    docker node update --label-add releasehub.db=true <nod>
+   docker node update --label-add releasehub.app=true <nod>
    ```
-   Bez etykiety usługa `db` czeka ze stanem „no suitable node".
+   Obie etykiety mogą być na tym samym nodzie. Bez etykiety usługa czeka ze stanem
+   „no suitable node". Przy dodawaniu etykiety do działającego stacka: najpierw etykieta,
+   potem redeploy.
 2. Portainer → **Stacks → Add stack**: wklej `docker-stack.yml` (**Web editor**) albo wskaż
    repozytorium i ścieżkę `docker-stack.yml` (**Repository**).
 3. **Environment variables** stacka — wartości z tabeli wyżej (nowe hasło bazy, nowy
@@ -108,6 +111,12 @@ Ten sam plik działa też jako zwykły stack compose w Portainerze bez Swarma.
 - **nie przepisuj nagłówka `Host`** — Server Actions w Next.js porównują `Origin` z `Host`;
   zmieniony `Host` psuje wszystkie formularze,
 - `COOKIE_SECURE` w stacku puste (cookie z flagą `secure`).
+
+> **Objaw: po zalogowaniu każdy formularz (np. zmiana hasła) wraca na `/login`, nic się nie
+> zapisuje.** Strona jest otwarta przez `http://` (np. `http://<nod>:3000`), a cookie sesji
+> ma flagę `secure` — przeglądarka je odrzuca. Ekran logowania pokazuje wtedy ostrzeżenie,
+> a w logach `app` jest „Login from http://… over plain HTTP". Wejdź przez `https://`
+> albo (tymczasowo, bez proxy) ustaw `COOKIE_SECURE=false`.
 
 Kopia zapasowa bazy jest poza aplikacją — np. `pg_dump` z crona na nodzie z etykietą.
 
@@ -184,8 +193,8 @@ domyślne konto `admin@example.com` (patrz „Pierwsze uruchomienie”).
 | `/` | Dashboard — wersje w przygotowaniu | wszyscy |
 | `/versions` | Zarządzanie wersjami | wszyscy · akcje: TESTER/ADMIN |
 | `/versions/new` | Nowa wersja | TESTER/ADMIN |
-| `/versions/[id]` | Widok wersji: checklista, instancje, komentarze | wszyscy |
-| `/versions/[id]/edit` | Edycja wersji (nazwa, data, aplikacja) | TESTER/ADMIN |
+| `/versions/[id]` | Widok wersji: checklista, instancje, komentarze · usuwanie (ADMIN) | wszyscy |
+| `/versions/[id]/edit` | Edycja wersji (nazwa, data, aplikacja, kroki, zadania, instancje) | TESTER/ADMIN |
 | `/archive` | Archiwum (wydane / anulowane) | wszyscy |
 | `/admin` | Panel administratora | ADMIN |
 
@@ -223,7 +232,7 @@ domyślne konto `admin@example.com` (patrz „Pierwsze uruchomienie”).
 **Docker** na firmowym VM.
 
 Mutacje przez **Server Actions** z walidacją `zod`; autoryzacja wyłącznie przez
-`requireRole()` po stronie serwera; zero hard delete (dezaktywacja przez `isActive`,
+`requireRole()` po stronie serwera; zero hard delete poza usuwaniem wersji przez ADMIN (dezaktywacja przez `isActive`,
 odpinanie przez `excludedAt`); każda mutacja audytowana w `ChangeLog` w tej samej
 transakcji. Pełny zestaw niezmienników → [`CLAUDE.md`](CLAUDE.md).
 

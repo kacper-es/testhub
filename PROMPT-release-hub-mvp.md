@@ -210,7 +210,7 @@ model ChangeLog {
 
 ### Reguły integralności
 
-- **Zero hard delete w całej aplikacji.** Wszystkie relacje do `User` mają `onDelete: Restrict`. Dezaktywacja przez `isActive`. Nie generuj żadnej akcji `delete` poza `Session`.
+- **Zero hard delete w całej aplikacji.** Wszystkie relacje do `User` mają `onDelete: Restrict`. Dezaktywacja przez `isActive`. Nie generuj żadnej akcji `delete` poza `Session` i `Version` (po MVP, decyzja 2026-11-08: trwałe usunięcie wersji wyłącznie przez `deleteVersion` — ADMIN, potwierdzenie nazwą, kaskada na dane wersji, wpis „usunięcie wersji" w `ChangeLog`).
 - Relacje do `Version` (`tasks`, `testRuns`, `comments`) mogą mieć `onDelete: Cascade`, ale nie buduj UI do usuwania wersji.
 
 ---
