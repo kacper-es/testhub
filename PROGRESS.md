@@ -1095,7 +1095,7 @@ do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
 - [x] **J-3** Synchronizacja ticketów do `JiraIssue` (ręczna, ADMIN): JQL `fixVersion = <id>`,
   ~~przyrostowo po `updated`~~ **pełna per wersja** (zmiana 2026-11-08, patrz krok J-3);
   klucz, tytuł, typ, status, kategoria statusu, przypisany, `updated`.
-- [ ] **J-4** Widok ticketów w wersji + `TICKET_AGGREGATE` liczony z Jiry (Done / wszystkie).
+- [x] **J-4** Widok ticketów w wersji + `TICKET_AGGREGATE` liczony z Jiry (Done / wszystkie).
 - [ ] **J-5** Pola własne: pobranie definicji (`/rest/api/3/field`), wybór przez admina,
   zapis wartości (JSONB), wyświetlanie. **Czeka na listę pól od użytkownika.**
 - [ ] **J-6** Automatyczna synchronizacja co N minut.
@@ -1378,6 +1378,60 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 
 ---
 
+## Krok J-4 — Tickety w wersji i licznik z Jiry `[x]`
+
+- [x] `lib/versions/ticket-source.ts` — tryb źródła liczb dla `TICKET_AGGREGATE`
+- [x] `lib/jira/counts.ts` — liczby z lokalnej kopii, jedno zapytanie dla wielu wersji
+- [x] Podgląd wersji: sekcja „Tickety Jira" + zadania licznikowe wg trybu
+- [x] Dashboard: status zadań licznikowych z tego samego helpera
+- [x] `setTicketCounters` odmawia poza trybem ręcznym
+
+### Decyzje
+- **Wariant A** (decyzja użytkownika): każde zadanie `TICKET_AGGREGATE` w wersji liczy całą
+  fixVersion (gotowe = kategoria `done` / wszystkie bez `removedAt`). Filtr JQL per szablon
+  (wariant B) odłożony.
+- **Tryby** (`ticketTaskView`, jedno źródło prawdy dla podglądu, dashboardu i akcji):
+  `jira` — wersja podpięta i zsynchronizowana (otwarta lub zamknięta; zamknięte nie są
+  synchronizowane, więc liczby zamrożone na ostatniej synchronizacji); `jira-unsynced` — podpięta,
+  bez synchronizacji: „—" + „Nie zsynchronizowano z Jirą"; `unmapped` — integracja skonfigurowana,
+  wersja otwarta, niepodpięta: „—" + „Niepodpięta do Jira" (jak w ustaleniach planu Jira);
+  `manual-edit` — **integracja nieskonfigurowana**, wersja otwarta: ręczne liczniki jak dotąd
+  (doprecyzowanie ustaleń — uniwersalność dla firm bez Jiry); `manual-readonly` — zamknięta bez
+  danych z Jiry: historyczne wartości ręczne. Kolumny `manualCounter*` bez zmian.
+- **`setTicketCounters`** woła ten sam helper i odmawia poza `manual-edit` (komunikat
+  „…liczony z Jiry — ręczna zmiana jest wyłączona").
+- **Sekcja „Tickety Jira"** (wszystkie role, tylko gdy wersja ma `jiraVersionId`): klucz (link
+  `<JIRA_BASE_URL>/browse/<KEY>` gdy integracja skonfigurowana), tytuł, typ, przypisany,
+  status jako odznaka wg kategorii (`new` neutral, `indeterminate` warn, `done` pass). Kolejność:
+  niegotowe najpierw, potem klucz z sortowaniem numerycznym (ABC-2 przed ABC-10). Nagłówek:
+  nazwa wersji Jira · M/N gotowych · czas synchronizacji. Pusty stan i stan „nie synchronizowano".
+  Polling 5 s czyta tylko lokalną bazę.
+- Bez zmian schematu i zależności.
+
+### Odłożone
+- Wariant B: filtr JQL na szablonie (różne liczniki w jednej wersji) — gdy będzie potrzebny.
+
+### Jak sprawdzić
+- Wersja podpięta i zsynchronizowana → podgląd: „Tickety Jira" z listą; zadania licznikowe
+  „M/N" + „z Jiry", bez pól ręcznych; dashboard: kropki statusu zgodne
+- Wyjęty z fixVersion ticket (po synchronizacji) znika z listy i z liczników
+- Wersja niepodpięta przy skonfigurowanej Jirze → „—" + „Niepodpięta do Jira"
+- Bez `JIRA_*` → ręczne liczniki działają jak przed J-4
+
+**Zweryfikowane w tej sesji:**
+- `npm run check` czysto; `npx vitest run` → **110/110** (nowy `ticket-source.test.ts`, 9 testów:
+  wszystkie tryby, DONE przy komplecie; akcja: odmowa przy podpiętej wersji i przy
+  skonfigurowanej Jirze bez podpięcia, przepuszczenie bez konfiguracji).
+- Docker + przeglądarka (bez `JIRA_*`): wersja `04.01.150` podpięta w SQL do fikcyjnej fixVersion
+  ze zsynchronizowanymi 4 ticketami (1 z `removedAt`): sekcja „TEST-FAKE · 1/3 gotowych", kolejność
+  ABC-2 (In Progress), ABC-10 (To Do), ABC-1 (Done), wyjęty nieobecny; oba zadania licznikowe
+  „1/3 · z Jiry", bez pól ręcznych; dashboard — oba zadania z kropką „w trakcie". Wersja `9.9.9`
+  (niepodpięta, Jira nieskonfigurowana): 4 pola ręczne, brak sekcji Jira. Dane testowe usunięte.
+- **Niezweryfikowane:** na prawdziwej Jirze — linki do ticketów i stan „Niepodpięta do Jira"
+  (wymaga skonfigurowanej Jiry) — sprawdzi użytkownik na produkcji.
+
+---
+
 ## Krok J-3 — Synchronizacja ticketów z Jiry `[x]`
 
 - [x] Migracja `20261108160000_jira_issues`: model `JiraIssue`, `Version.jiraSyncedAt`
@@ -1437,7 +1491,8 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
   z Jirą."; w bazie 0 `JiraIssue`, `jiraSyncedAt` puste; `/admin/jira` → „04.01.150: Błąd
   sieci…"; token w logach: 0 wystąpień. Podpięcie cofnięte, kontener bez zmiennych Jira.
   Pierwszy build padł na `react/no-unescaped-entities` (cudzysłów w tekście) — poprawione.
-- **Niezweryfikowane:** synchronizacja na prawdziwej Jirze (tylko produkcja użytkownika).
+- ~~Niezweryfikowane: synchronizacja na prawdziwej Jirze~~ → **zweryfikowane przez użytkownika
+  2026-11-08 na produkcji**: synchronizacja działa.
 
 ---
 

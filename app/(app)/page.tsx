@@ -7,6 +7,8 @@ import {
 } from '@/lib/versions/app-filter'
 import { LivePolling } from '@/components/versions/LivePolling'
 import { VersionCard } from '@/components/versions/VersionCard'
+import { jiraCountsByVersion } from '@/lib/jira/counts'
+import { readJiraConfig } from '@/lib/jira/config'
 import { AppFilterNav } from '@/components/versions/AppFilterNav'
 
 const APP_SELECT = {
@@ -40,6 +42,12 @@ export default async function DashboardPage({
     getFilterApps(scopeWhere),
   ])
 
+  // Liczby ticketów z Jiry dla zadań TICKET_AGGREGATE (J-4) — jedno zapytanie.
+  const jiraCounts = await jiraCountsByVersion(
+    versions.filter((v) => v.jiraVersionId !== null).map((v) => v.id),
+  )
+  const jiraConfigured = readJiraConfig().status === 'configured'
+
   const hrefFor = (value: string) =>
     value === 'all' ? '/' : `/?app=${encodeURIComponent(value)}`
 
@@ -67,7 +75,13 @@ export default async function DashboardPage({
         ) : (
           <div className="grid gap-4 sm:grid-cols-2">
             {versions.map((version) => (
-              <VersionCard key={version.id} version={version} today={today} />
+              <VersionCard
+                key={version.id}
+                version={version}
+                today={today}
+                jiraCounts={jiraCounts.get(version.id) ?? null}
+                jiraConfigured={jiraConfigured}
+              />
             ))}
           </div>
         )}

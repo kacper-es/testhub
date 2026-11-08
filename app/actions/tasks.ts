@@ -7,6 +7,8 @@ import { requireRole } from '@/lib/auth/authz'
 import { assertVersionEditable } from '@/lib/versions/guard'
 import { logChange } from '@/lib/versions/log-change'
 import { ticketAggregateStatus } from '@/lib/versions/aggregates'
+import { ticketTaskView } from '@/lib/versions/ticket-source'
+import { readJiraConfig } from '@/lib/jira/config'
 import { taskStatusSchema, ticketCountersSchema } from '@/lib/validation/task'
 
 export type ActionResult = { error?: string }
@@ -85,12 +87,27 @@ export async function setTicketCounters(
 
   const task = await prisma.versionTask.findUnique({
     where: { id: versionTaskId },
-    include: { version: { select: { status: true } }, taskTemplate: true },
+    include: {
+      version: { select: { status: true, jiraVersionId: true, jiraSyncedAt: true } },
+      taskTemplate: true,
+    },
   })
   if (!task) return { error: 'Nie znaleziono zadania' }
   assertVersionEditable(task.version.status)
   if (task.taskTemplate.taskType !== 'TICKET_AGGREGATE') {
     return { error: 'To zadanie nie jest licznikiem ticketów' }
+  }
+  // J-4: ręczny licznik tylko tam, gdzie UI go pokazuje (ten sam helper).
+  const mode = ticketTaskView({
+    versionStatus: task.version.status,
+    jiraMapped: task.version.jiraVersionId !== null,
+    jiraSynced: task.version.jiraSyncedAt !== null,
+    jiraConfigured: readJiraConfig().status === 'configured',
+    manual: { current: task.manualCounterCurrent, total: task.manualCounterTotal },
+    jira: null,
+  }).mode
+  if (mode !== 'manual-edit') {
+    return { error: 'Licznik ticketów jest liczony z Jiry — ręczna zmiana jest wyłączona.' }
   }
 
   const nextCurrent = parsed.data.current

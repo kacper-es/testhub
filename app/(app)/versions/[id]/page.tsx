@@ -21,6 +21,8 @@ import {
   type LastChangeMap,
 } from '@/components/versions/InstanceRunsTable'
 import { CommentForm } from '@/components/versions/CommentForm'
+import { readJiraConfig } from '@/lib/jira/config'
+import { ticketTaskView } from '@/lib/versions/ticket-source'
 import { DeleteVersion } from '@/components/versions/DeleteVersion'
 import Link from 'next/link'
 import { AppIcon } from '@/components/versions/AppIcon'
@@ -56,6 +58,13 @@ const VERSION_STATUS: Record<
   IN_PROGRESS: { label: 'W przygotowaniu', badge: 'warn' },
   RELEASED: { label: 'Wydana', badge: 'pass' },
   CANCELLED: { label: 'Anulowana', badge: 'fail' },
+}
+
+// Kategoria statusu Jiry → kolor odznaki (J-4).
+const JIRA_CATEGORY_BADGE: Record<string, BadgeStatus> = {
+  new: 'neutral',
+  indeterminate: 'warn',
+  done: 'pass',
 }
 
 function TaskStatusBadge({ status }: { status: TaskStatus }) {
@@ -199,6 +208,32 @@ export default async function VersionDetailPage({
     }))
     .sort((a, b) => a.resolved.sortOrder - b.resolved.sortOrder)
 
+  // Tickety z Jiry (J-4) — z lokalnej kopii, bez odpytywania Jiry. Liczby dla zadań
+  // TICKET_AGGREGATE z jednego helpera (ten sam co na dashboardzie).
+  const jiraCfg = readJiraConfig()
+  const jiraIssues = version.jiraVersionId
+    ? await prisma.jiraIssue.findMany({
+        where: { versionId: version.id, removedAt: null },
+        orderBy: { key: 'asc' },
+      })
+    : []
+  const sortedIssues = [...jiraIssues].sort(
+    (a, b) =>
+      Number(a.statusCategory === 'done') - Number(b.statusCategory === 'done') ||
+      a.key.localeCompare(b.key, undefined, { numeric: true }),
+  )
+  const jiraDone = jiraIssues.filter((i) => i.statusCategory === 'done').length
+  const ticketView = (task: { manualCounterCurrent: number; manualCounterTotal: number }) =>
+    ticketTaskView({
+      versionStatus: version.status,
+      jiraMapped: version.jiraVersionId !== null,
+      jiraSynced: version.jiraSyncedAt !== null,
+      jiraConfigured: jiraCfg.status === 'configured',
+      manual: { current: task.manualCounterCurrent, total: task.manualCounterTotal },
+      jira: { done: jiraDone, total: jiraIssues.length },
+    })
+  const jiraBrowseUrl = jiraCfg.status === 'configured' ? `${jiraCfg.config.baseUrl}/browse/` : null
+
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
       {/* Polling 5 s — odświeża Server Components (sekcja 7). */}
@@ -269,22 +304,36 @@ export default async function VersionDetailPage({
                     />
                   )}
 
-                  {resolved.taskType === 'TICKET_AGGREGATE' && (
-                    <div className="flex flex-col items-end gap-1">
-                      <TaskStatusBadge
-                        status={ticketAggregateStatus(
-                          task.manualCounterCurrent,
-                          task.manualCounterTotal,
-                        )}
-                      />
-                      <TicketCounterControl
-                        versionTaskId={task.id}
-                        current={task.manualCounterCurrent}
-                        total={task.manualCounterTotal}
-                        disabled={disabled}
-                      />
-                    </div>
-                  )}
+                  {resolved.taskType === 'TICKET_AGGREGATE' &&
+                    (() => {
+                      const t = ticketView(task)
+                      return (
+                        <div className="flex flex-col items-end gap-1">
+                          <TaskStatusBadge status={t.status} />
+                          {t.mode === 'manual-edit' ? (
+                            <TicketCounterControl
+                              versionTaskId={task.id}
+                              current={t.current}
+                              total={t.total}
+                              disabled={disabled}
+                            />
+                          ) : (
+                            <span className="font-mono text-sm text-fg">
+                              {t.total === 0 ? '—' : `${t.current}/${t.total}`}
+                            </span>
+                          )}
+                          {t.mode === 'jira' && (
+                            <span className="text-xs text-muted">z Jiry</span>
+                          )}
+                          {t.mode === 'jira-unsynced' && (
+                            <span className="text-xs text-muted">Nie zsynchronizowano z Jirą</span>
+                          )}
+                          {t.mode === 'unmapped' && (
+                            <span className="text-xs text-muted">Niepodpięta do Jira</span>
+                          )}
+                        </div>
+                      )
+                    })()}
 
                   {resolved.taskType === 'INSTANCE_AGGREGATE' && (
                     <div
@@ -301,6 +350,54 @@ export default async function VersionDetailPage({
           ))
         )}
       </section>
+
+      {version.jiraVersionId && (
+        <section className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold">Tickety Jira</h2>
+            <span className="font-mono text-sm text-muted">
+              {version.jiraVersionName}
+              {version.jiraSyncedAt
+                ? ` · ${jiraDone}/${jiraIssues.length} gotowych · synchronizacja ${whenFmt.format(version.jiraSyncedAt)}`
+                : ''}
+            </span>
+          </div>
+          {!version.jiraSyncedAt ? (
+            <p className="text-sm text-muted">
+              Tickety nie były jeszcze synchronizowane — administrator robi to w edycji wersji.
+            </p>
+          ) : sortedIssues.length === 0 ? (
+            <p className="text-sm text-muted">Brak ticketów w tej wersji Jira.</p>
+          ) : (
+            <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
+              {sortedIssues.map((i) => (
+                <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+                  {jiraBrowseUrl ? (
+                    <a
+                      href={`${jiraBrowseUrl}${encodeURIComponent(i.key)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-fg underline underline-offset-2"
+                    >
+                      {i.key}
+                    </a>
+                  ) : (
+                    <span className="font-mono text-fg">{i.key}</span>
+                  )}
+                  <span className="min-w-0 flex-1 text-fg">{i.summary}</span>
+                  <span className="text-xs text-muted">{i.issueType}</span>
+                  {i.assigneeName && (
+                    <span className="text-xs text-muted">{i.assigneeName}</span>
+                  )}
+                  <StatusBadge status={JIRA_CATEGORY_BADGE[i.statusCategory] ?? 'neutral'}>
+                    {i.statusName}
+                  </StatusBadge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Instancje</h2>

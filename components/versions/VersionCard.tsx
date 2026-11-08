@@ -7,10 +7,8 @@ import {
   toDateOnly,
   urgency,
 } from '@/lib/versions/deadline'
-import {
-  instanceAggregateStatus,
-  ticketAggregateStatus,
-} from '@/lib/versions/aggregates'
+import { instanceAggregateStatus } from '@/lib/versions/aggregates'
+import { ticketTaskView, type JiraCounts } from '@/lib/versions/ticket-source'
 import { TASK_STATUS_META } from '@/lib/versions/task-status'
 import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge'
 import { StepDots } from '@/components/ui/StepDots'
@@ -50,9 +48,14 @@ const URGENCY_TEXT = {
 export function VersionCard({
   version,
   today,
+  jiraCounts,
+  jiraConfigured,
 }: {
   version: DashboardVersion
   today: string
+  // Liczby z lokalnej kopii Jiry (J-4) — ten sam helper co w podglądzie wersji.
+  jiraCounts: JiraCounts | null
+  jiraConfigured: boolean
 }) {
   const checkboxColumnIds = new Set(
     version.columns
@@ -76,10 +79,14 @@ export function VersionCard({
       if (resolved.taskType === 'CHECKBOX') {
         status = task.status
       } else if (resolved.taskType === 'TICKET_AGGREGATE') {
-        status = ticketAggregateStatus(
-          task.manualCounterCurrent,
-          task.manualCounterTotal,
-        )
+        status = ticketTaskView({
+          versionStatus: version.status,
+          jiraMapped: version.jiraVersionId !== null,
+          jiraSynced: version.jiraSyncedAt !== null,
+          jiraConfigured,
+          manual: { current: task.manualCounterCurrent, total: task.manualCounterTotal },
+          jira: jiraCounts,
+        }).status
       } else {
         status = instanceAgg.status
       }
