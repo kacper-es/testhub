@@ -23,3 +23,8 @@ export const versionJiraSchema = z.object({
     .refine((v) => v === '' || /^\d+$/.test(v), { message: 'Nieprawidłowa wersja Jira' })
     .transform((v) => (v === '' ? null : v)),
 })
+
+// Synchronizacja ticketów jednej wersji (J-3).
+export const jiraSyncSchema = z.object({
+  versionId: z.string().min(1),
+})

@@ -20,6 +20,13 @@ import {
   type JiraVersionOption,
 } from '@/components/versions/VersionJiraForm'
 import { AddVersionTasks } from '@/components/versions/AddVersionTasks'
+import { VersionJiraSync } from '@/components/versions/VersionJiraSync'
+
+const syncFmt = new Intl.DateTimeFormat('pl-PL', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Europe/Warsaw',
+})
 import { readJiraConfig } from '@/lib/jira/config'
 import { getProjectVersions, JiraError } from '@/lib/jira/client'
 import { selectableJiraVersions } from '@/lib/jira/versions'
@@ -44,6 +51,7 @@ export default async function EditVersionPage({
       applicationId: true,
       jiraVersionId: true,
       jiraVersionName: true,
+      jiraSyncedAt: true,
       application: {
         select: { id: true, name: true, isActive: true, jiraProjectKey: true },
       },
@@ -120,6 +128,18 @@ export default async function EditVersionPage({
       return !r || r.excludedAt !== null
     })
     .map((i) => ({ id: i.id, name: i.name, hadData: runByInstanceId.has(i.id) }))
+
+  // Stan synchronizacji ticketów (J-3) — tylko ADMIN i wersja podpięta do Jiry.
+  let jiraSyncText: string | null = null
+  if (jira && version.jiraVersionId && version.jiraSyncedAt) {
+    const [total, done] = await Promise.all([
+      prisma.jiraIssue.count({ where: { versionId: id, removedAt: null } }),
+      prisma.jiraIssue.count({
+        where: { versionId: id, removedAt: null, statusCategory: 'done' },
+      }),
+    ])
+    jiraSyncText = `Ostatnia synchronizacja: ${syncFmt.format(version.jiraSyncedAt)} · ${total} ticketów, ${done} gotowych`
+  }
 
   // Zadania (reguła 6): aktywne szablony nieobecne w wersji — do dołożenia.
   const [taskCount, missingTemplates] = await Promise.all([
@@ -277,6 +297,9 @@ export default async function EditVersionPage({
                   : [{ id: version.jiraVersionId!, label: version.jiraVersionName ?? '' }]
               }
             />
+          )}
+          {version.jiraVersionId && (
+            <VersionJiraSync versionId={version.id} lastSync={jiraSyncText} />
           )}
         </section>
       )}

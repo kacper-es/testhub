@@ -94,16 +94,19 @@ model Version {
   // bez odpytywania Jiry. Jedna wersja Jira = najwyżej jedna wersja Release Hub.
   jiraVersionId     String?       @unique
   jiraVersionName   String?
+  // Ostatnia udana synchronizacja ticketów z Jiry (J-3).
+  jiraSyncedAt      DateTime?
   createdAt         DateTime      @default(now())
 
   createdBy       User         @relation("CreatedVersions", fields: [createdById], references: [id], onDelete: Restrict)
   statusChangedBy User?        @relation("StatusChangedVersions", fields: [statusChangedById], references: [id], onDelete: Restrict)
   application     Application? @relation(fields: [applicationId], references: [id], onDelete: Restrict)
 
-  tasks    VersionTask[]
-  testRuns InstanceTestRun[]
-  comments VersionComment[]
-  columns  VersionColumn[]
+  tasks      VersionTask[]
+  testRuns   InstanceTestRun[]
+  comments   VersionComment[]
+  columns    VersionColumn[]
+  jiraIssues JiraIssue[]
 
   @@index([status, releaseDate])
   @@index([applicationId])
@@ -305,4 +308,26 @@ model ChangeLog {
 
   @@index([versionId, createdAt])
   @@index([entityType, entityId, field, createdAt])
+}
+
+// Lokalna kopia ticketów z fixVersion (J-3). Zero hard delete: ticket, który
+// zniknął z fixVersion, dostaje removedAt; wraca → removedAt = null.
+model JiraIssue {
+  id             String    @id @default(cuid())
+  versionId      String
+  jiraId         String // id ticketu w Jirze (stałe, klucz może się zmienić przy przeniesieniu)
+  key            String // np. ABC-123
+  summary        String
+  issueType      String
+  statusName     String
+  statusCategory String // "new" | "indeterminate" | "done"
+  assigneeName   String?
+  jiraUpdatedAt  DateTime
+  syncedAt       DateTime
+  removedAt      DateTime?
+
+  version Version @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, jiraId])
+  @@index([versionId, removedAt])
 }

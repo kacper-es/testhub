@@ -1092,8 +1092,9 @@ do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
 - [x] **J-1** Połączenie: klient Jira (`fetch` + auth z env, obsługa 401/403/404/429/5xx),
   strona admina „Jira" z „Testuj połączenie" i stanem konfiguracji. Paginacja → J-3.
 - [x] **J-2** Mapowanie: `Application.jiraProjectKey`, `Version.jiraVersionId` (wybór z listy wersji projektu).
-- [ ] **J-3** Synchronizacja ticketów do `JiraIssue` (ręczna, ADMIN): JQL `fixVersion = <id>`,
-  przyrostowo po `updated`; klucz, tytuł, typ, status, kategoria statusu, przypisany, `updated`.
+- [x] **J-3** Synchronizacja ticketów do `JiraIssue` (ręczna, ADMIN): JQL `fixVersion = <id>`,
+  ~~przyrostowo po `updated`~~ **pełna per wersja** (zmiana 2026-11-08, patrz krok J-3);
+  klucz, tytuł, typ, status, kategoria statusu, przypisany, `updated`.
 - [ ] **J-4** Widok ticketów w wersji + `TICKET_AGGREGATE` liczony z Jiry (Done / wszystkie).
 - [ ] **J-5** Pola własne: pobranie definicji (`/rest/api/3/field`), wybór przez admina,
   zapis wartości (JSONB), wyświetlanie. **Czeka na listę pól od użytkownika.**
@@ -1147,7 +1148,8 @@ do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
   `.env` nietknięty): konfiguracja pokazana, token jako „ustawiony", test →
   „Błąd sieci — nie udało się połączyć z Jirą."; `docker compose logs app` — 0 wystąpień tokenu.
   Kontener przywrócony bez zmiennych Jira, `/health` 200.
-- **Niezweryfikowane:** połączenie z prawdziwą Jirą (brak tokenu).
+- ~~Niezweryfikowane: połączenie z prawdziwą Jirą~~ → **zweryfikowane przez użytkownika
+  2026-11-08 na produkcji** (Swarm, `JIRA_*` w zmiennych stacka): „Testuj połączenie" działa.
 
 ---
 
@@ -1207,7 +1209,8 @@ do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
 - `npm run check` czysto; `docker compose up -d --build` → „No pending migrations", Ready.
 - Przeglądarka (bez `JIRA_*`): ADMIN — sekcja „Jira" w edycji aplikacji (nieskonfigurowana, pole
   wyłączone) i w edycji wersji `04.01.150` (podpowiedź o kluczu projektu); TESTER — brak sekcji.
-- **Niezweryfikowane:** lista fixVersion i zapis mapowania na prawdziwej Jirze (brak tokenu).
+- ~~Niezweryfikowane: lista fixVersion i zapis mapowania na prawdziwej Jirze~~ → **zweryfikowane
+  przez użytkownika 2026-11-08 na produkcji**: klucz projektu przy aplikacji i wybór fixVersion działają.
 - Środowisko: Docker Desktop znów padł na martwym sockecie (`Docker\run`) — przeniesione na bok
   (`*.broken-20261028-*`), zgodnie z wcześniejszą zgodą użytkownika.
 
@@ -1372,6 +1375,69 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 - Środowisko: Docker Desktop nie wstawał (martwe sockety w `%LOCALAPPDATA%\Docker\run`
   i `%LOCALAPPDATA%\docker-secrets-engine`, przeniesione na bok jako `*.broken-20261108-*`
   za zgodą użytkownika); naprawił dopiero restart Windows — przy kolejnej awarii zacząć od restartu.
+
+---
+
+## Krok J-3 — Synchronizacja ticketów z Jiry `[x]`
+
+- [x] Migracja `20261108160000_jira_issues`: model `JiraIssue`, `Version.jiraSyncedAt`
+- [x] `lib/jira/issues.ts` (pobieranie z paginacją i 429), `lib/jira/sync.ts` (zapis)
+- [x] Akcje `syncVersionJiraIssues`, `syncAllOpenJiraVersions` (ADMIN)
+- [x] UI: „Synchronizuj teraz" w sekcji Jira edycji wersji, „Synchronizuj wszystkie otwarte
+  wersje" w `/admin/jira`
+
+### Decyzje
+- **Pełna synchronizacja wersji zamiast przyrostowej** (zmiana uzgodnionego planu, zaakceptowana
+  z planem kroku): zapytanie po `updated` nie widzi ticketu wyjętego z fixVersion, więc licznik
+  w J-4 byłby zawyżony. Koszt: 1–3 zapytania po 100 ticketów na wersję.
+- **Schemat** (diff pokazany i zaakceptowany): `JiraIssue` (`jiraId` = stałe id z Jiry, `key`,
+  `summary`, `issueType`, `statusName`, `statusCategory`, `assigneeName`, `jiraUpdatedAt`,
+  `syncedAt`, `removedAt`), `@@unique([versionId, jiraId])`, kaskada z `Version` (V-2 usuwa też
+  tickety). `Version.jiraSyncedAt`. Migracja przez `migrate diff` z bazy lokalnej + `migrate
+  deploy` (nieinteraktywny terminal), plik w repo. `prisma format` wyrównał relacje w `Version`.
+- **Zero hard delete także dla kopii:** ticket nieobecny w wyniku → `removedAt = now`; wraca →
+  `removedAt = null`. J-4 pokaże tylko `removedAt IS NULL`.
+- **Pobieranie:** `GET /rest/api/3/search/jql`, JQL `fixVersion = <id> ORDER BY key ASC` (id
+  sprawdzane jako same cyfry przed wstawieniem do JQL), pola `summary,issuetype,status,assignee,
+  updated`, 100 na stronę, `nextPageToken`/`isLast`; limit 50 stron → `TooManyIssuesError`.
+  429 → do 3 ponowień, czekanie wg `Retry-After` (bez nagłówka 1/2/4 s, max 30 s); inne błędy
+  bez ponawiania. Błędy przez `JiraError` ze stałymi komunikatami (treść Jiry nie przechodzi).
+- **Zapis:** najpierw całe pobranie (poza transakcją), potem jedna transakcja: ponowny odczyt
+  wersji (otwarta i nadal ta sama fixVersion — inaczej przerwanie), upsert zwróconych,
+  `removedAt` dla brakujących, `jiraSyncedAt`. Błąd pobierania = zero zmian. Bez `ChangeLog`
+  (dane zewnętrzne, nie zmiana użytkownika).
+- **Akcje:** tylko ADMIN; odmowa dla wersji zamkniętej, niepodpiętej i przy braku konfiguracji.
+  „Wszystkie" — otwarte wersje z `jiraVersionId`, po kolei, wynik per wersja (błąd jednej nie
+  zatrzymuje reszty).
+- **UI:** stan „Ostatnia synchronizacja: <data> · N ticketów, M gotowych" liczony na serwerze
+  (strefa Europe/Warsaw), przycisk tylko gdy wersja ma podpiętą fixVersion. Lista ticketów → J-4.
+
+### Odłożone
+- Wyświetlanie ticketów i licznik z Jiry zamiast ręcznego `TICKET_AGGREGATE` → J-4.
+- Automatyczna synchronizacja → J-6.
+
+### Jak sprawdzić
+- ADMIN, wersja z podpiętą fixVersion → edycja → „Synchronizuj teraz" → „Zsynchronizowano: N
+  ticketów, M gotowych"; N zgadza się z Jirą (filtr `fixVersion = <wersja>`); po odświeżeniu
+  „Ostatnia synchronizacja: …"
+- Wyjęcie ticketu z fixVersion w Jirze → ponowna synchronizacja → „…, 1 wyjętych z wersji"
+- `/admin/jira` → „Synchronizuj wszystkie otwarte wersje" → wynik dla każdej podpiętej wersji
+- PM/TESTER: brak przycisków; akcje odrzucone serwerowo
+
+**Zweryfikowane w tej sesji:**
+- `npm run check` czysto; `npx vitest run` → **101/101** (nowy `jira-sync.test.ts`, 14 testów:
+  mapowanie i wartości domyślne, paginacja po `nextPageToken`, 429 z `Retry-After` → ponowienie,
+  429 ponad limit → błąd (4 zapytania), 401 bez ponawiania, nieskończona paginacja →
+  `TooManyIssuesError`, nie-liczbowe id nie trafia do JQL, zapis: upsert + przywrócenie +
+  `removedAt` + `jiraSyncedAt`; akcje: odmowa PM i TESTER (obie), wersja zamknięta, niepodpięta,
+  brak konfiguracji).
+- Docker z `JIRA_BASE_URL=https://jira.invalid` + zmyślony token (tylko zmienne powłoki), wersja
+  `04.01.150` tymczasowo podpięta w SQL do fikcyjnej fixVersion: edycja → „Tickety nie były
+  jeszcze synchronizowane" + „Synchronizuj teraz" → „Błąd sieci — nie udało się połączyć
+  z Jirą."; w bazie 0 `JiraIssue`, `jiraSyncedAt` puste; `/admin/jira` → „04.01.150: Błąd
+  sieci…"; token w logach: 0 wystąpień. Podpięcie cofnięte, kontener bez zmiennych Jira.
+  Pierwszy build padł na `react/no-unescaped-entities` (cudzysłów w tekście) — poprawione.
+- **Niezweryfikowane:** synchronizacja na prawdziwej Jirze (tylko produkcja użytkownika).
 
 ---
 

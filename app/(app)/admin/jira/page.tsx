@@ -2,6 +2,7 @@ import { requireRolePage } from '@/lib/auth/authz'
 import { readJiraConfig, JIRA_ENV_VARS } from '@/lib/jira/config'
 import { Card } from '@/components/ui/Card'
 import { JiraConnectionTest } from '@/components/admin/JiraConnectionTest'
+import { JiraSyncAll } from '@/components/admin/JiraSyncAll'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,6 +67,17 @@ export default async function JiraAdminPage() {
         )}
 
         <JiraConnectionTest disabled={cfg.status !== 'configured'} />
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Synchronizacja ticketów</h2>
+          <p className="mt-1 text-sm text-muted">
+            Pobiera tickety z podpiętych wersji Jira (fixVersion) do wszystkich otwartych wersji.
+            Pojedynczą wersję zsynchronizujesz w jej edycji, w sekcji „Jira&rdquo;.
+          </p>
+        </div>
+        <JiraSyncAll disabled={cfg.status !== 'configured'} />
       </Card>
     </main>
   )
