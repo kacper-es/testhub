@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { SESSION_COOKIE } from '@/lib/auth/cookie'
+import { SESSION_COOKIE, cookieSecure } from '@/lib/auth/cookie'
 
 // Lekka brama na Edge: decyduje wyłącznie na podstawie OBECNOŚCI cookie sesji.
 // Pełna walidacja (podpis, wygaśnięcie, isActive) oraz redirect przy
@@ -33,7 +33,7 @@ export function middleware(req: NextRequest) {
   res.cookies.set(SESSION_COOKIE, cookie.value, {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     path: '/',
     maxAge: EIGHT_HOURS_S,
   })

@@ -5,6 +5,7 @@ import type { Theme } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { requireUser } from '@/lib/auth/authz'
 import { THEME_COOKIE } from '@/lib/theme'
+import { cookieSecure } from '@/lib/auth/cookie'
 
 const ONE_YEAR_S = 60 * 60 * 24 * 365
 
@@ -18,7 +19,7 @@ export async function setTheme(theme: Theme): Promise<void> {
   jar.set(THEME_COOKIE, theme, {
     httpOnly: false,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     path: '/',
     maxAge: ONE_YEAR_S,
   })

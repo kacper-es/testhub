@@ -12,7 +12,7 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)
-![tests](https://img.shields.io/badge/testy-33%20passing-3B6D11?style=flat-square)
+![tests](https://img.shields.io/badge/testy-70%20passing-3B6D11?style=flat-square)
 
 [Specyfikacja](PROMPT-release-hub-mvp.md) ·
 [Reguły projektu](CLAUDE.md) ·
@@ -32,6 +32,7 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 | ✏️ **Edycja wersji** | Osobny ekran: zmiana nazwy, daty wydania, aplikacji i kroków wersji (terminy się przesuwają) |
 | 🗄️ **Archiwum** | Wersje wydane i anulowane z powodem i filtrami |
 | 🛠️ **Panel admina** | Szablony zadań, aplikacje (z ikonami), katalog instancji, kroki i szablony (flow), konta, log zmian |
+| 🔗 **Jira Cloud** | Read-only: test połączenia, mapowanie aplikacji na projekt i wersji na fixVersion (ADMIN) |
 | 🌗 **Motywy** | Jasny / ciemny / systemowy, bez migotania, zapisywane per użytkownik |
 | 🔄 **Na żywo** | Polling co 5 s na dashboardzie i widoku wersji |
 | 🔐 **Bezpieczeństwo** | Autoryzacja per rola po stronie serwera, audyt zmian w `ChangeLog` |
@@ -55,6 +56,36 @@ docker compose up --build
 - Health check bazy → **http://localhost:3000/health** → „Baza: OK"
 
 Postgres trzyma dane w named volume `pgdata` — przetrwają `docker compose down`.
+
+### Zmienne środowiskowe
+
+| Zmienna | Opis |
+|---|---|
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Dane bazy (usługa `db`) |
+| `SESSION_SECRET` | Długi losowy ciąg: `openssl rand -hex 32` |
+| `COOKIE_SECURE` | Puste = cookie z flagą `secure` (wymaga HTTPS). `false` tylko przy serwowaniu po zwykłym HTTP |
+| `DATABASE_URL` | Tylko dla lokalnych narzędzi (host `localhost`); w kontenerze nadpisywany na host `db` |
+| `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Opcjonalne — puste = integracja nieskonfigurowana |
+
+## 🏢 Wdrożenie (Portainer)
+
+Docelowo: firmowa VM z Portainerem, stack z repozytorium Git. VM ma wychodzący
+internet (build pobiera paczki npm, integracja łączy się z Jira Cloud); aplikacja
+nie jest dostępna z internetu.
+
+1. Portainer → **Stacks → Add stack → Repository**: URL repo + dane dostępowe,
+   ścieżka compose `docker-compose.yml`. Portainer klonuje repo i buduje obraz (`build: .`).
+2. **Environment variables** stacka: wartości z tabeli wyżej (nowe hasło bazy, nowy
+   `SESSION_SECRET`). Plik `.env` nie trafia do Portainera — jest w `.gitignore`.
+   Bez HTTPS przed aplikacją ustaw `COOKIE_SECURE=false`, inaczej logowanie się zapętla
+   (cookie sesji idzie wtedy przez sieć otwartym tekstem — docelowo reverse proxy z TLS).
+3. **Deploy the stack.** Entrypoint aplikacji uruchamia `prisma migrate deploy` przed startem;
+   błąd migracji zatrzymuje kontener (logi: **Containers → app → Logs**).
+4. Sprawdź `http://<vm>:3000/health` → „Baza: OK".
+
+> **Jeszcze nie gotowe do produkcji** — zobacz krok D-1 w [`PROGRESS.md`](PROGRESS.md):
+> `npm run seed` zakłada konta z hasłem deweloperskim, a `docker-compose.yml` wystawia
+> port bazy `5432`.
 
 ## 🧑‍💻 Rozwój lokalny
 
@@ -117,6 +148,7 @@ W produkcji admin ustawia własne hasła — nie używaj tych wartości poza dev
 | `/admin/columns` | Konfiguracja kroków (kolumn tabeli instancji) i szablonów (flow) |
 | `/admin/users` | Konta (tworzenie, reset hasła, rola, dezaktywacja) |
 | `/admin/changelog` | Log zmian z filtrami i paginacją |
+| `/admin/jira` | Stan konfiguracji Jira i test połączenia |
 
 </details>
 
@@ -146,5 +178,7 @@ transakcji. Pełny zestaw niezmienników → [`CLAUDE.md`](CLAUDE.md).
 ## 📌 Stan
 
 **MVP kompletne (kroki 1–10)** + iteracje UX (wspólny header z nawigacją i okruszkami,
-katalog instancji w panelu admina, osobny ekran edycji wersji). Opcjonalny krok 11
-(SSE + `LISTEN/NOTIFY`) — po MVP. Szczegóły i historia decyzji → [`PROGRESS.md`](PROGRESS.md).
+katalog instancji w panelu admina, osobny ekran edycji wersji), konfigurowalne kroki
+i szablony z kolejnością drag-and-drop oraz integracja Jira — kroki J-1 i J-2 (połączenie,
+mapowanie); synchronizacja ticketów (J-3…J-6) w toku. Następne: wdrożenie na VM (krok D-1).
+Opcjonalny krok 11 (SSE + `LISTEN/NOTIFY`) — po MVP. Szczegóły i historia decyzji → [`PROGRESS.md`](PROGRESS.md).

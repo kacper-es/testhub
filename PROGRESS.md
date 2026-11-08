@@ -203,6 +203,7 @@ Legenda: `[ ]` nierozpoczęte · `[~]` w toku · `[x]` zrobione
 - `Instance.name`/`TaskTemplate.name` bez `@unique` — pod import CSV „po name" (krok 8) może być
   potrzebny unikat albo inna strategia upsertu; decyzja w kroku 8, nie ruszam schematu teraz.
 - Seedowanie bazy produkcyjnej (na VM) — poza zakresem; ten sam skrypt przeciw prod `DATABASE_URL`.
+  → Zrewidowane w kroku D-1: seed nie nadaje się na produkcję, potrzebny osobny skrypt admina.
 
 ### Jak sprawdzić
 - Dwukrotne uruchomienie seeda nie tworzy duplikatów
@@ -1209,6 +1210,65 @@ do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
 - **Niezweryfikowane:** lista fixVersion i zapis mapowania na prawdziwej Jirze (brak tokenu).
 - Środowisko: Docker Desktop znów padł na martwym sockecie (`Docker\run`) — przeniesione na bok
   (`*.broken-20261028-*`), zgodnie z wcześniejszą zgodą użytkownika.
+
+---
+
+## Krok D-1 — Wdrożenie na VM (Portainer) `[ ]`
+
+Ustalone 2026-11-08, jeszcze nic nie zbudowane. Dokumentacja wdrożenia: README → „Wdrożenie (Portainer)".
+
+### Ustalenia
+- **Portainer, stack z repozytorium Git** — Portainer klonuje repo i buduje obraz z `build: .`.
+  Zmienne (`POSTGRES_*`, `SESSION_SECRET`, `JIRA_*`) w „Environment variables" stacka, nie w `.env`.
+- **VM ma wychodzący internet** (npm w czasie builda, Jira Cloud). „Brak dostępu z internetu"
+  w specyfikacji dotyczy ruchu przychodzącego — aplikacja widoczna tylko w sieci firmowej.
+  Założenie „brak internetu w czasie builda" (fonty) było ostrożnością, nie faktem o infrastrukturze;
+  zvendorowane fonty zostają.
+
+### Do zrobienia (każde z planem do akceptacji)
+- [x] **Flaga `secure` cookie** — przełącznik `COOKIE_SECURE` (decyzja użytkownika 2026-11-08,
+  szczegóły niżej). Weryfikacja w Dockerze — patrz „Jak sprawdzić".
+- [ ] **Pierwszy admin na produkcji** — `npm run seed` wymaga `tsx` (devDependency, nie ma go
+  w obrazie) i zakłada konta z hasłem `Dev12345!` + przykładowe dane. Potrzebny skrypt w czystym
+  JS w obrazie, uruchamiany z konsoli kontenera w Portainerze, zakładający tylko jednego ADMIN-a.
+- [ ] **Port `5432`** wystawiony w `docker-compose.yml` (potrzebny lokalnie) — na VM nie może być
+  otwarty. Do decyzji: osobny plik compose dla Portainera albo przeniesienie portu do override'u lokalnego.
+- [ ] **Aktualizacje** — sprawdzić, czy redeploy stacka w Portainerze przebudowuje obraz po zmianie kodu.
+
+### Decyzje
+- **`COOKIE_SECURE` w env** zamiast stałego `NODE_ENV === 'production'`. Jeden helper
+  `cookieSecure()` w `lib/auth/cookie.ts` (moduł bez zależności — bezpieczny w Edge), użyty
+  w 4 miejscach: `lib/auth/session.ts`, `middleware.ts` (rolling refresh), `app/actions/auth.ts`
+  i `app/actions/theme.ts` (cookie motywu). `false`/`true` (bez wielkości liter, z trim) nadpisują;
+  puste lub inna wartość → domyślne `secure` w produkcji. Wyłączenie wymaga świadomego `false`.
+- Zmienne czytane po nazwie literalnej (`process.env.COOKIE_SECURE`) jako domyślne argumenty —
+  testowalne bez mutowania `process.env`.
+- `docker-compose.yml`: `COOKIE_SECURE: ${COOKIE_SECURE:-}`; `.env.example` z ostrzeżeniem
+  o cookie otwartym tekstem po HTTP.
+
+### Pytania otwarte
+- Czy w firmie jest reverse proxy z HTTPS (Traefik/nginx przy Portainerze) i firmowe CA?
+- Kopia zapasowa bazy (`pg_dump` z crona na VM) — poza aplikacją (MVP), ale ktoś musi ją ustawić.
+
+### Jak sprawdzić
+- Stack wstaje w Portainerze, logi `app`: `Running prisma migrate deploy...` → Ready
+- `http://<vm>:3000/health` → „Baza: OK"; port `5432` niedostępny z innej maszyny
+- Logowanie pierwszym adminem działa z przeglądarki w sieci firmowej
+- `COOKIE_SECURE=false`, `http://<host>:3000`: logowanie działa; odpowiedź z middleware
+  (`curl -sI -b rh_session=x http://<host>:3000/`) ma `Set-Cookie` **bez** `Secure`
+- Ten sam obraz bez `COOKIE_SECURE`: ten sam `curl` → `Set-Cookie` **z** `Secure`
+  (dowód, że middleware czyta zmienną w runtime, a nie wkleja jej przy buildzie)
+
+**Zweryfikowane w tej sesji:**
+- `npm run check` czysto; `npx vitest run` → **70/70** (nowy `cookie.test.ts`, 6 testów).
+- `COOKIE_SECURE=false docker compose up -d --build`: `/health` 200; `curl` z cookie →
+  `Set-Cookie: rh_session=…; HttpOnly; SameSite=lax` (bez `Secure`). Przeglądarka:
+  logowanie przez `http://localhost:3000` → dashboard, przejście na `/archive` bez wylogowania.
+- Ten sam obraz, `docker compose up -d` bez zmiennej (kontener odtworzony, `COOKIE_SECURE` puste):
+  ten sam `curl` → `… Secure; HttpOnly; SameSite=lax`. **Middleware czyta zmienną w runtime.**
+- Środowisko: Docker Desktop nie wstawał (martwe sockety w `%LOCALAPPDATA%\Docker\run`
+  i `%LOCALAPPDATA%\docker-secrets-engine`, przeniesione na bok jako `*.broken-20261108-*`
+  za zgodą użytkownika); naprawił dopiero restart Windows — przy kolejnej awarii zacząć od restartu.
 
 ---
 

@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { cache } from 'react'
 import type { User } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { SESSION_COOKIE } from '@/lib/auth/cookie'
+import { SESSION_COOKIE, cookieSecure } from '@/lib/auth/cookie'
 
 export { SESSION_COOKIE }
 
@@ -42,7 +42,7 @@ function cookieOptions(expires: Date) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     path: '/',
     expires,
   }

@@ -17,6 +17,7 @@ import {
 } from '@/lib/auth/rate-limit'
 import { changePasswordSchema, loginSchema } from '@/lib/validation/auth'
 import { THEME_COOKIE } from '@/lib/theme'
+import { cookieSecure } from '@/lib/auth/cookie'
 
 export type LoginState = { error?: string }
 export type ChangePasswordState = { error?: string }
@@ -64,7 +65,7 @@ export async function login(
   jar.set(THEME_COOKIE, user.theme, {
     httpOnly: false,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: cookieSecure(),
     path: '/',
     maxAge: 60 * 60 * 24 * 365,
   })

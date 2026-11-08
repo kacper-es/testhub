@@ -30,6 +30,9 @@ services:
       # npm run check) uruchamianym poza kontenerem.
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?schema=public
       SESSION_SECRET: ${SESSION_SECRET}
+      # Puste = cookie z flagą `secure` (wymaga HTTPS). `false` tylko dla wdrożenia
+      # po zwykłym HTTP, dopóki nie ma reverse proxy z TLS.
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
       # Jira Cloud (read-only). Puste domyślne — brak konfiguracji nie blokuje startu.
       JIRA_BASE_URL: ${JIRA_BASE_URL:-}
       JIRA_EMAIL: ${JIRA_EMAIL:-}
