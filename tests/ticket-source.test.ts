@@ -100,9 +100,8 @@ describe('setTicketCounters with Jira (J-4)', () => {
   })
 
   it('version mapped to Jira → manual change refused', async () => {
-    // @ts-expect-error — partial mock
     vi.mocked(prisma.versionTask.findUnique).mockResolvedValue(
-      task({ jiraVersionId: '1', jiraSyncedAt: new Date() }),
+      task({ jiraVersionId: '1', jiraSyncedAt: new Date() }) as never,
     )
     const res = await setTicketCounters('t1', 1, 2)
     expect(res).toEqual({
@@ -115,9 +114,8 @@ describe('setTicketCounters with Jira (J-4)', () => {
     vi.stubEnv('JIRA_BASE_URL', 'https://acme.atlassian.net')
     vi.stubEnv('JIRA_EMAIL', 'bot@acme.com')
     vi.stubEnv('JIRA_API_TOKEN', 'secret-token')
-    // @ts-expect-error — partial mock
     vi.mocked(prisma.versionTask.findUnique).mockResolvedValue(
-      task({ jiraVersionId: null, jiraSyncedAt: null }),
+      task({ jiraVersionId: null, jiraSyncedAt: null }) as never,
     )
     const res = await setTicketCounters('t1', 1, 2)
     expect(res).toHaveProperty('error')
@@ -128,9 +126,8 @@ describe('setTicketCounters with Jira (J-4)', () => {
     vi.stubEnv('JIRA_BASE_URL', '')
     vi.stubEnv('JIRA_EMAIL', '')
     vi.stubEnv('JIRA_API_TOKEN', '')
-    // @ts-expect-error — partial mock
     vi.mocked(prisma.versionTask.findUnique).mockResolvedValue(
-      task({ jiraVersionId: null, jiraSyncedAt: null }),
+      task({ jiraVersionId: null, jiraSyncedAt: null }) as never,
     )
     vi.mocked(prisma.$transaction).mockResolvedValue(undefined as never)
     await setTicketCounters('t1', 1, 2)
