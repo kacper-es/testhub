@@ -8,8 +8,9 @@ import {
   instanceAggregateStatus,
   ticketAggregateStatus,
 } from '@/lib/versions/aggregates'
-import { resolveDeadline, toDateOnly } from '@/lib/versions/deadline'
+import { daysRemaining, resolveDeadline, toDateOnly, urgency } from '@/lib/versions/deadline'
 import { TASK_STATUS_META } from '@/lib/versions/task-status'
+import { Card, Eyebrow } from '@/components/ui/Card'
 import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge'
 import { StepDots } from '@/components/ui/StepDots'
 import { CheckboxTaskControl } from '@/components/versions/CheckboxTaskControl'
@@ -26,6 +27,11 @@ import Link from 'next/link'
 import { AppIcon } from '@/components/versions/AppIcon'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/cn'
+import { buildBurnup, buildTimeline } from '@/lib/versions/overview'
+import { FIELD_LABEL, displayValue } from '@/lib/versions/changelog-labels'
+import { ReleaseTimeline } from '@/components/versions/ReleaseTimeline'
+import { JiraPanel } from '@/components/versions/JiraPanel'
+import { EventLog, type EventLogEntry } from '@/components/versions/EventLog'
 
 // Ostatnia zmiana każdej flagi/notatki, jednym zapytaniem DISTINCT ON (reguła 4 —
 // nie per flaga). Zwraca wiersze najświeższej zmiany dla (entityId, field).
@@ -58,12 +64,28 @@ const VERSION_STATUS: Record<
   CANCELLED: { label: 'Anulowana', badge: 'fail' },
 }
 
-// Kategoria statusu Jiry → kolor odznaki (J-4).
-const JIRA_CATEGORY_BADGE: Record<string, BadgeStatus> = {
-  new: 'neutral',
-  indeterminate: 'warn',
-  done: 'pass',
-}
+const EVENT_LOG_SIZE = 8
+
+const timeFmt = new Intl.DateTimeFormat('pl-PL', {
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Warsaw',
+})
+
+const dayFmt = new Intl.DateTimeFormat('pl-PL', {
+  day: '2-digit',
+  month: '2-digit',
+  timeZone: 'Europe/Warsaw',
+})
+
+// Data wydania (@db.Date = północ UTC) — formatowana w UTC, by nie przesunąć dnia.
+const releaseFmt = new Intl.DateTimeFormat('pl-PL', {
+  weekday: 'short',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  timeZone: 'UTC',
+})
 
 function TaskStatusBadge({ status }: { status: TaskStatus }) {
   const m = TASK_STATUS_META[status]
@@ -87,12 +109,13 @@ function DeadlineLabel({
     today,
   )
   if (info.kind === 'flexible') {
-    return <span className="text-xs text-muted">elastyczny</span>
+    return <span className="font-mono text-xs text-muted">elastyczny</span>
   }
 
+  // UI-2b: a far deadline stays neutral — lime/green means "done" in Telemetria.
   const cls =
     info.urgency.level === 'pass'
-      ? 'text-pass-strong'
+      ? 'text-muted'
       : info.urgency.level === 'warn'
         ? 'text-warn-strong'
         : 'text-fail-strong'
@@ -232,39 +255,142 @@ export default async function VersionDetailPage({
     })
   const jiraBrowseUrl = jiraCfg.status === 'configured' ? `${jiraCfg.config.baseUrl}/browse/` : null
 
+  // --- UI-2b: overview data — all date math on the server (rule 25) ----------
+  const releaseDay = toDateOnly(version.releaseDate)
+  const daysLeft = daysRemaining(releaseDay, today)
+  const releaseLevel = urgency(daysLeft).level
+
+  const effectiveStatus = (
+    task: (typeof rows)[number]['task'],
+    resolved: ResolvedTask,
+  ): TaskStatus =>
+    resolved.taskType === 'TICKET_AGGREGATE'
+      ? ticketView(task).status
+      : resolved.taskType === 'INSTANCE_AGGREGATE'
+        ? instanceAgg.status
+        : task.status
+  const taskStates = rows.map((r) => ({ ...r, status: effectiveStatus(r.task, r.resolved) }))
+  const tasksDone = taskStates.filter((t) => t.status === 'DONE').length
+
+  const timeline = buildTimeline(
+    today,
+    releaseDay,
+    taskStates.flatMap(({ task, resolved, status }) => {
+      const info = resolveDeadline(
+        resolved.deadlineType,
+        resolved.daysBeforeRelease,
+        version.releaseDate,
+        today,
+      )
+      return info.kind === 'deadline'
+        ? [
+            {
+              id: task.id,
+              name: resolved.name,
+              deadline: info.deadline,
+              done: status === 'DONE',
+              level: info.urgency.level,
+              overdue: info.urgency.overdue,
+            },
+          ]
+        : []
+    }),
+  )
+
+  const stepsTotal = activeRuns.length * checkboxColumnIds.size
+  const stepsDone = activeRuns.reduce(
+    (n, run) =>
+      n + run.values.filter((v) => checkboxColumnIds.has(v.versionColumnId) && v.boolValue).length,
+    0,
+  )
+
+  const snapshots = version.jiraVersionId
+    ? await prisma.jiraSnapshot.findMany({
+        where: { versionId: version.id },
+        orderBy: { day: 'asc' },
+        select: { day: true, total: true, done: true },
+      })
+    : []
+  const burnup = buildBurnup(snapshots, today)
+
+  // Log zdarzeń: ostatnie wpisy ChangeLog wersji (treści notatek nie pokazujemy).
+  const logRows = await prisma.changeLog.findMany({
+    where: { versionId: version.id },
+    orderBy: { createdAt: 'desc' },
+    take: EVENT_LOG_SIZE,
+    include: { user: { select: { name: true } } },
+  })
+  const runName = new Map(version.testRuns.map((r) => [r.id, r.instance.name]))
+  const taskName = new Map(rows.map((r) => [r.task.id, r.resolved.name]))
+  const colName = new Map(version.columns.map((c) => [c.id, c.name]))
+  const describeChange = (e: (typeof logRows)[number]): string => {
+    if (e.entityType === 'InstanceTestRun') {
+      const what = FIELD_LABEL[e.field] ?? colName.get(e.field) ?? 'krok'
+      const value = e.field === 'notes' ? 'zmiana' : displayValue(e.newValue)
+      return `${what} · ${runName.get(e.entityId) ?? 'instancja'}: ${value}`
+    }
+    if (e.entityType === 'VersionTask') {
+      const name = taskName.get(e.entityId) ?? 'zadanie'
+      if (e.field === 'status') {
+        const meta = TASK_STATUS_META[e.newValue as TaskStatus]
+        return `${name}: ${meta ? meta.label.toLowerCase() : displayValue(e.newValue)}`
+      }
+      return `${name} · ${FIELD_LABEL[e.field] ?? e.field}: ${displayValue(e.newValue)}`
+    }
+    return `${FIELD_LABEL[e.field] ?? e.field}: ${displayValue(e.newValue)}`
+  }
+  const events: EventLogEntry[] = logRows.map((e) => ({
+    id: e.id,
+    when:
+      todayInWarsaw(e.createdAt) === today ? timeFmt.format(e.createdAt) : dayFmt.format(e.createdAt),
+    user: e.user.name,
+    text: describeChange(e),
+  }))
+
+  const jiraTile = !version.jiraVersionId
+    ? { value: '—', sub: jiraCfg.status === 'configured' ? 'niepodpięta do Jiry' : 'Jira wyłączona' }
+    : !version.jiraSyncedAt
+      ? { value: '—', sub: 'brak synchronizacji' }
+      : {
+          value: `${jiraDone}/${jiraIssues.length}`,
+          sub: `sync ${whenFmt.format(version.jiraSyncedAt)}`,
+        }
+
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 px-4 py-6 sm:px-8">
       {/* Polling 5 s — odświeża Server Components (sekcja 7). */}
       {!closed && <LivePolling />}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <h1 className="flex items-center gap-2 font-mono text-2xl font-semibold">
-            <AppIcon app={version.application} />
-            {version.name}
-          </h1>
-          <StatusBadge status={vs.badge}>{vs.label}</StatusBadge>
-          <span className="font-mono text-sm text-muted">
-            wydanie {toDateOnly(version.releaseDate)}
-          </span>
+      <header className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <Eyebrow>{version.application ? `${version.application.name} / wersja` : 'Wersja'}</Eyebrow>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="m-0 flex items-center gap-3 font-mono text-3xl font-bold tracking-tight sm:text-4xl">
+              <AppIcon app={version.application} />
+              {version.name}
+            </h1>
+            <StatusBadge status={vs.badge}>{vs.label}</StatusBadge>
+          </div>
         </div>
 
-        {!disabled && (
-          <Link href={`/versions/${version.id}/edit`}>
-            <Button variant="secondary">Edytuj wersję</Button>
-          </Link>
-        )}
-        {/* Closed version: edit is off, deletion (ADMIN) lives on the edit page. */}
-        {closed && user.role === 'ADMIN' && (
-          <Link href={`/versions/${version.id}/edit`}>
-            <Button variant="ghost">Usuń wersję…</Button>
-          </Link>
-        )}
-      </div>
+        <div className="flex flex-wrap gap-2">
+          {!disabled && (
+            <Link href={`/versions/${version.id}/edit`}>
+              <Button variant="secondary">Edytuj wersję</Button>
+            </Link>
+          )}
+          {/* Closed version: edit is off, deletion (ADMIN) lives on the edit page. */}
+          {closed && user.role === 'ADMIN' && (
+            <Link href={`/versions/${version.id}/edit`}>
+              <Button variant="ghost">Usuń wersję…</Button>
+            </Link>
+          )}
+        </div>
+      </header>
 
       {closed && (
         <div
           role="status"
-          className="rounded-lg border border-border bg-surface-raised px-4 py-3 text-sm text-muted"
+          className="rounded-[4px] border border-border bg-surface-raised px-4 py-3 text-sm text-muted"
         >
           Wersja zamknięta — tylko do odczytu.
           {version.status === 'CANCELLED' && version.cancelReason && (
@@ -273,27 +399,109 @@ export default async function VersionDetailPage({
         </div>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Checklista</h2>
+      <section aria-label="Podsumowanie" className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <Card className="flex flex-col gap-2">
+          <Eyebrow>{closed ? 'Wydanie' : 'Do wydania'}</Eyebrow>
+          {closed ? (
+            <span className="font-mono text-3xl font-bold leading-none sm:text-4xl">
+              {releaseDay.slice(8, 10)}.{releaseDay.slice(5, 7)}
+            </span>
+          ) : (
+            <span
+              className={cn(
+                'font-mono text-3xl font-bold leading-none sm:text-4xl',
+                releaseLevel === 'fail' && 'text-fail-strong',
+                releaseLevel === 'warn' && 'text-warn-strong',
+              )}
+            >
+              {daysLeft < 0 ? `T+${-daysLeft}` : `T−${daysLeft}`}
+              <span className="text-base font-normal text-muted"> dni</span>
+            </span>
+          )}
+          <span className="font-mono text-xs text-muted">{releaseFmt.format(version.releaseDate)}</span>
+        </Card>
 
-        {rows.length === 0 ? (
-          <p className="text-sm text-muted">
-            Brak zadań w tej wersji — w chwili utworzenia nie było aktywnych
-            szablonów.
-          </p>
-        ) : (
-          // UI-1: one compact row per task; description in a tooltip (+ sr-only).
-          <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface shadow-sm">
-            {rows.map(({ task, resolved }) => (
+        <Card className="flex flex-col gap-2">
+          <Eyebrow>Checklista</Eyebrow>
+          <span className="font-mono text-3xl font-bold leading-none sm:text-4xl">
+            {tasksDone}
+            <span className="text-muted">/{rows.length}</span>
+          </span>
+          <div
+            className="mt-1 flex gap-[3px]"
+            role="img"
+            aria-label={`${tasksDone} z ${rows.length} zadań gotowych`}
+          >
+            {taskStates.map(({ task, status }) => (
+              <span
+                key={task.id}
+                className={cn(
+                  'h-1.5 flex-1',
+                  status === 'DONE'
+                    ? 'bg-pass'
+                    : status === 'IN_PROGRESS'
+                      ? 'bg-warn'
+                      : 'bg-border-strong',
+                )}
+              />
+            ))}
+          </div>
+        </Card>
+
+        <Card className="flex flex-col gap-2">
+          <Eyebrow>Instancje gotowe</Eyebrow>
+          <span className="font-mono text-3xl font-bold leading-none sm:text-4xl">
+            {instanceAgg.done}
+            <span className="text-muted">/{instanceAgg.total}</span>
+          </span>
+          <span className="font-mono text-xs text-muted">
+            {stepsTotal > 0
+              ? `${stepsDone} z ${stepsTotal} kroków · ${Math.round((stepsDone / stepsTotal) * 100)}%`
+              : 'brak kroków'}
+          </span>
+        </Card>
+
+        <Card className="flex flex-col gap-2">
+          <Eyebrow>Tickety Jira</Eyebrow>
+          <span className="font-mono text-3xl font-bold leading-none sm:text-4xl">{jiraTile.value}</span>
+          <span className="font-mono text-xs text-muted">{jiraTile.sub}</span>
+        </Card>
+      </section>
+
+      <div className="grid items-start gap-4 lg:grid-cols-12">
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-8">
+          <Card className="flex flex-col gap-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="m-0">
+                <Eyebrow>Checklista i terminy</Eyebrow>
+              </h2>
+              <span className="font-mono text-xs text-muted">
+                dziś {today.slice(8, 10)}.{today.slice(5, 7)}
+              </span>
+            </div>
+
+            {timeline.markers.length > 0 && <ReleaseTimeline timeline={timeline} />}
+
+            {rows.length === 0 ? (
+              <p className="text-sm text-muted">
+                Brak zadań w tej wersji — w chwili utworzenia nie było aktywnych szablonów.
+              </p>
+            ) : (
+              // UI-1: one compact row per task; description in a tooltip (+ sr-only).
+              <ul className="m-0 flex list-none flex-col divide-y divide-border border-t border-border p-0">
+            {rows.map(({ task, resolved }, i) => (
               <li
                 key={task.id}
-                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2"
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5"
               >
                 <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <span aria-hidden className="w-6 font-mono text-xs text-muted">
+                    {String(i + 1).padStart(2, '0')}
+                  </span>
                   <span
                     className={cn(
                       'font-medium text-fg',
-                      resolved.description && 'cursor-help underline decoration-dotted decoration-border underline-offset-4',
+                      resolved.description && 'cursor-help underline decoration-dotted decoration-border-strong underline-offset-4',
                     )}
                     title={resolved.description ?? undefined}
                   >
@@ -309,7 +517,7 @@ export default async function VersionDetailPage({
                   />
                 </div>
 
-                <div className="flex shrink-0 items-center gap-3">
+                <div className="ml-auto flex flex-wrap items-center justify-end gap-3">
                   {resolved.taskType === 'CHECKBOX' && (
                     <CheckboxTaskControl
                       versionTaskId={task.id}
@@ -330,7 +538,7 @@ export default async function VersionDetailPage({
                               ? 'Niepodpięta do Jira'
                               : null
                       return (
-                        <div className="flex items-center gap-3">
+                        <div className="flex flex-wrap items-center justify-end gap-3">
                           {note && <span className="text-xs text-muted">{note}</span>}
                           {t.mode === 'manual-edit' ? (
                             <TicketCounterControl
@@ -361,109 +569,72 @@ export default async function VersionDetailPage({
                 </div>
               </li>
             ))}
-          </ul>
-        )}
-      </section>
+              </ul>
+            )}
+          </Card>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Instancje</h2>
-        <InstanceRunsTable
-          runs={activeRuns}
-          columns={activeColumns.map((c) => ({ id: c.id, name: c.name }))}
-          values={valueMap}
-          disabled={disabled}
-          lastChanges={lastChanges}
-        />
-      </section>
+          <Card className="flex flex-col gap-4">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="m-0">
+                <Eyebrow>Instancje × kroki</Eyebrow>
+              </h2>
+              {stepsTotal > 0 && (
+                <span className="font-mono text-xs text-muted">
+                  {stepsDone}/{stepsTotal}
+                </span>
+              )}
+            </div>
+            <InstanceRunsTable
+              runs={activeRuns}
+              columns={activeColumns.map((c) => ({ id: c.id, name: c.name }))}
+              values={valueMap}
+              disabled={disabled}
+              lastChanges={lastChanges}
+            />
+          </Card>
+        </div>
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold">Komentarze</h2>
-        {!disabled && <CommentForm versionId={version.id} />}
+        <div className="flex min-w-0 flex-col gap-4 lg:col-span-4">
+          {version.jiraVersionId && (
+            <JiraPanel
+              jiraVersionName={version.jiraVersionName}
+              syncedText={version.jiraSyncedAt ? `sync ${whenFmt.format(version.jiraSyncedAt)}` : null}
+              issues={sortedIssues}
+              burnup={burnup}
+              browseUrl={jiraBrowseUrl}
+            />
+          )}
 
-        {version.comments.length === 0 ? (
-          <p className="text-sm text-muted">Brak komentarzy.</p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {version.comments.map((c) => (
-              <li
-                key={c.id}
-                className="rounded-lg border border-border bg-surface p-3"
-              >
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium text-fg">
-                    {c.author.name}
-                  </span>
-                  <span className="font-mono text-xs text-muted">
-                    {commentFmt.format(c.createdAt)}
-                  </span>
-                </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-fg">
-                  {c.content}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+          <EventLog
+            entries={events}
+            fullLogHref={user.role === 'ADMIN' ? `/admin/changelog?versionId=${version.id}` : null}
+          />
 
-      {version.jiraVersionId && (
-        // UI-1: collapsed by default, below comments; list scrolls inside.
-        <details className="group rounded-lg border border-border bg-surface shadow-sm">
-          <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-2 rounded-lg px-4 py-3 [&::-webkit-details-marker]:hidden">
-            <span className="flex items-center gap-2 text-lg font-semibold">
-              <span
-                aria-hidden="true"
-                className="inline-block text-sm text-muted transition-transform group-open:rotate-90 motion-reduce:transition-none"
-              >
-                ▶
-              </span>
-              Tickety Jira
-            </span>
-            <span className="font-mono text-sm text-muted">
-              {version.jiraVersionName}
-              {version.jiraSyncedAt
-                ? ` · ${jiraDone}/${jiraIssues.length} gotowych · synchronizacja ${whenFmt.format(version.jiraSyncedAt)}`
-                : ''}
-            </span>
-          </summary>
-          <div className="border-t border-border">
-            {!version.jiraSyncedAt ? (
-              <p className="px-4 py-3 text-sm text-muted">
-                Tickety nie były jeszcze synchronizowane — administrator robi to w edycji wersji.
-              </p>
-            ) : sortedIssues.length === 0 ? (
-              <p className="px-4 py-3 text-sm text-muted">Brak ticketów w tej wersji Jira.</p>
+          <Card className="flex flex-col gap-3">
+            <h2 className="m-0">
+              <Eyebrow>Komentarze</Eyebrow>
+            </h2>
+            {!disabled && <CommentForm versionId={version.id} />}
+            {version.comments.length === 0 ? (
+              <p className="text-sm text-muted">Brak komentarzy.</p>
             ) : (
-              <ul className="flex max-h-[60vh] flex-col divide-y divide-border overflow-y-auto">
-                {sortedIssues.map((i) => (
-                  <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
-                    {jiraBrowseUrl ? (
-                      <a
-                        href={`${jiraBrowseUrl}${encodeURIComponent(i.key)}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="font-mono text-fg underline underline-offset-2"
-                      >
-                        {i.key}
-                      </a>
-                    ) : (
-                      <span className="font-mono text-fg">{i.key}</span>
-                    )}
-                    <span className="min-w-0 flex-1 text-fg">{i.summary}</span>
-                    <span className="text-xs text-muted">{i.issueType}</span>
-                    {i.assigneeName && (
-                      <span className="text-xs text-muted">{i.assigneeName}</span>
-                    )}
-                    <StatusBadge status={JIRA_CATEGORY_BADGE[i.statusCategory] ?? 'neutral'}>
-                      {i.statusName}
-                    </StatusBadge>
+              <ul className="m-0 flex list-none flex-col divide-y divide-border p-0">
+                {version.comments.map((c) => (
+                  <li key={c.id} className="py-3">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium text-fg">{c.author.name}</span>
+                      <span className="font-mono text-[11px] text-muted">
+                        {commentFmt.format(c.createdAt)}
+                      </span>
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-sm text-fg">{c.content}</p>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
-        </details>
-      )}
+          </Card>
+        </div>
+      </div>
     </main>
   )
 }

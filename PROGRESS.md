@@ -1411,6 +1411,124 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 
 ---
 
+## Krok UI-2c — Dashboard, listy i reszta stron `[x]`
+
+- [x] `lib/versions/summary.ts` — `summarizeVersion` (zadania z resolveTask, agregaty, T−N, mini oś); karty i KPI z jednego źródła
+- [x] Dashboard: pasek KPI (najbliższe wydanie, otwarte wersje, zadania gotowe, po terminie) + karty w 2–3 kolumnach
+- [x] `VersionCard`: T−N, mini oś z terminami, mierniki (checklista, kroki instancji, tickety Jira), maks. 4 otwarte zadania wg terminu
+- [x] Lista wersji i archiwum w siatce kart; archiwum z wykresem zamkniętych wersji wg miesiąca (12 mies., `monthlyClosed`)
+- [x] Wszystkie strony: kontener do 1440 px (formularze 3xl), nagłówki `text-3xl font-bold`; panel admina w 3 kolumnach
+
+### Decyzje
+
+- Karta pokazuje tylko otwarte zadania (najpilniejsze najpierw) — gotowe są w pasku segmentów; „✓ wszystkie
+  zadania gotowe", gdy nic nie zostało.
+- Miernik „Kroki instancji" liczy zaznaczone kroki (jak kafel w widoku wersji), opis podaje gotowe instancje.
+- Wykres archiwum idzie za filtrami (status, aplikacja), miesiąc wg daty wydania.
+- Formularze (edycja, nowe rekordy) zostają w jednej kolumnie — wielokolumnowo tylko widoki z danymi.
+
+### Jak sprawdzić
+
+1. Dashboard: KPI zgadzają się z kartami; karta prowadzi do wersji; filtr aplikacji działa.
+2. Archiwum z zamkniętymi wersjami → wykres słupkowy wydane/anulowane, filtry zmieniają wykres.
+3. Wersje, admin, edycja, logowanie — nowy styl w obu motywach; telefon bez poziomego przewijania.
+
+### Zweryfikowane
+
+- Lokalnie (docker, oba motywy + telefon): punkty 1–3 (do wykresu archiwum jedna wersja tymczasowo
+  oznaczona jako wydana w bazie i przywrócona). Testy 166/166.
+
+---
+
+## Krok UI-2b — Widok wersji „Telemetria" `[x]`
+
+- [x] Migracja `20261109150000_jira_snapshots`: model `JiraSnapshot` (dzienny stan ticketów wersji)
+- [x] `applyIssueSync` zapisuje stan dnia w tej samej transakcji (ręczna i automatyczna synchronizacja)
+- [x] `lib/versions/overview.ts`: `buildTimeline` + `assignLanes`, `buildBurnup`, `burnupPolylines` (czyste, testowane)
+- [x] Widok wersji: kafle (T−N, checklista, instancje, tickety), układ 8 + 4 kolumny do 1440 px
+- [x] `ReleaseTimeline` — oś do wydania z terminami zadań; `JiraPanel` — statusy, burn-up, zwijana lista;
+      `EventLog` — ostatnie 8 wpisów ChangeLog; macierz instancji z kolumną Σ
+- [x] `lib/versions/changelog-labels.ts` — etykiety pól wspólne dla logu admina i logu zdarzeń
+
+### Decyzje
+
+- Snapshot: klucz `(versionId, day)`, dzień w strefie Europe/Warsaw; ostatnia synchronizacja dnia
+  nadpisuje. Burn-up: ostatnie 14 dni od pierwszego snapshotu, dni bez synchronizacji przenoszą
+  poprzednią wartość; wykres od 2 punktów (wcześniej komunikat).
+- Oś czasu: zakres od wcześniejszej z (dziś, pierwszy termin) do późniejszej z (wydanie, dziś) — mieści
+  zaległe terminy i zaległe wydanie. Etykiety na 4 torach (2 nad, 2 pod osią), min. odstęp 25% osi,
+  przy braku miejsca sam romb z podpowiedzią; etykiety przy krawędziach kotwiczone do krawędzi.
+- Kolory terminów: daleki termin neutralny (szary), bo limonka oznacza „gotowe"; ostrzeżenie/pilne/po
+  terminie bez zmian (reguła 26).
+- Log zdarzeń nie pokazuje treści notatek („notatki: zmiana"). Link „cały log" tylko dla ADMIN.
+- Prawa kolumna: Jira (gdy wersja podpięta), log zdarzeń, komentarze. Na telefonie wszystko w jednej kolumnie.
+
+### Odłożone
+
+- Burn-up na produkcji zacznie się rysować dopiero po synchronizacjach z dwóch różnych dni.
+
+### Jak sprawdzić
+
+1. Wersja otwarta z terminami → oś czasu z rombami, „dziś" i „release"; kafel T−N w kolorze pilności.
+2. Wersja podpięta do Jiry i zsynchronizowana → panel Jira: pasek statusów, liczby, lista ticketów
+   (zwinięta). Po synchronizacji następnego dnia → burn-up.
+3. Zaznaczenie kroku instancji → wpis w „Log zdarzeń" po odświeżeniu (polling 5 s); Σ w macierzy rośnie.
+4. Szerokość telefonu → jedna kolumna, bez poziomego przewijania.
+
+### Zweryfikowane
+
+- Lokalnie (docker, oba motywy + telefon): punkty 1–4 na danych testowych (40 ticketów i 11 snapshotów
+  wstawionych ręcznie i usuniętych; data wydania tymczasowo przesunięta i przywrócona). Testy 165/165.
+
+---
+
+## Krok UI-2a — Fundament „Telemetria" `[x]`
+
+Kierunek wybrany z trzech makiet (A · Telemetria): ciemny, sygnałowy, limonkowy akcent,
+Space Grotesk + JetBrains Mono, ostre rogi, etykiety mono wersalikami. Kolejne kroki:
+UI-2b (widok wersji: kafle, oś czasu, macierz, panel Jira z burn-upem — wymaga tabeli
+historii ticketów, zmiana schematu do pokazania), UI-2c (dashboard, archiwum, edycja, admin, logowanie).
+
+- [x] Fonty Space Grotesk + JetBrains Mono (variable, latin + latin-ext) w `public/fonts`, `next/font/local`
+- [x] Tokeny w `globals.css` (oba motywy) + nowe: `accent`, `on-accent`, `signal`, `on-pass`, `border-strong`
+- [x] Komponenty: Card (znacznik w rogu) + `Eyebrow`, Button, StatusBadge, Input/Field, Checkbox, StepDots
+- [x] Boczna kolumna (`AppSidebar`) zamiast górnego paska: nawigacja, otwarte wersje z T−N, motyw, konto
+- [x] Zaokrąglenia i aktywne stany ujednolicone w całej aplikacji (`rounded-[3px|4px]`, `bg-accent`)
+- [x] `tests/contrast.test.ts` — kontrast tokenów liczony z `globals.css`
+
+### Decyzje
+
+- Fonty dalej vendorowane (build bez internetu), ale teraz z latin-ext — wcześniejsze IBM Plex /
+  JetBrains miały tylko latin, polskie znaki szły z fontu systemowego. Dwie rodziny na krój
+  (latin, latin-ext) w jednym stosie `font-family`; `adjustFontFallback: false`, bo fallback
+  Nexta przechwytywał polskie glify przed plikiem latin-ext.
+- Jasny motyw „papier": złamana biel, grafit; akcent to grafitowy przycisk z limonkowym tekstem,
+  zielenie przyciemnione do oliwkowych (jasna limonka na jasnym tle nie przechodzi 3:1).
+- Kontrast (obie wersje): tekst ≥ 5,3:1, statusy/sygnał/focus/obramowanie kontrolek ≥ 3:1 —
+  pilnuje tego test. `--border` (dekoracyjny podział) zostaje słabszy; kontrolki formularzy
+  dostały `--border-strong`.
+- Focus zostaje niebieski w obu motywach (spec 9.1 — nie może mylić się z pass, a pass to limonka).
+- T−N w kolumnie bocznej: maks. 8 najbliższych otwartych wersji, kolor wg progów pilności (reguła 26),
+  liczone w layoucie na serwerze. Na telefonie kolumna staje się paskiem u góry, lista wersji ukryta.
+
+### Odłożone
+
+- Wiersze checklisty z ręcznym licznikiem wychodzą poza ekran na telefonie — widok wersji jest
+  przebudowywany w UI-2b.
+
+### Jak sprawdzić
+
+1. Dashboard i widok wersji w trzech motywach (Jasny / Ciemny / Systemowy).
+2. Polskie znaki (ł, ą, ę) w nagłówkach i etykietach mono w tym samym kroju co reszta.
+3. Kolumna boczna: aktywna sekcja podświetlona, otwarte wersje z T−N, link do wersji.
+4. Szerokość telefonu → kolumna zamienia się w pasek u góry.
+
+### Zweryfikowane
+
+- Lokalnie (docker): punkty 1–4 (jasny i ciemny; fonty latin-ext ładują się). Testy 155/155.
+
+---
+
 ## Krok J-6 + health 503 `[x]`
 
 - [x] `lib/jira/sync-version.ts` — wspólna synchronizacja (przeniesiona z `app/actions/jira.ts`)

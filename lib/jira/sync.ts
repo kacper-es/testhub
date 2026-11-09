@@ -1,9 +1,11 @@
 import type { Prisma } from '@prisma/client'
 import type { JiraIssueData } from '@/lib/jira/issues'
+import { todayInWarsaw } from '@/lib/date'
 
 // Zapis wyniku pełnej synchronizacji jednej wersji (J-3), wołany w transakcji:
 // zwrócone tickety → upsert (removedAt = null), pozostałe tickety wersji →
-// removedAt = now (zniknęły z fixVersion; zero hard delete), Version.jiraSyncedAt.
+// removedAt = now (zniknęły z fixVersion; zero hard delete), Version.jiraSyncedAt
+// oraz dzienny stan do burn-upu (UI-2b; ostatnia synchronizacja dnia nadpisuje).
 
 export type SyncSummary = { total: number; done: number; removed: number }
 
@@ -32,9 +34,15 @@ export async function applyIssueSync(
 
   await tx.version.update({ where: { id: versionId }, data: { jiraSyncedAt: now } })
 
-  return {
-    total: issues.length,
-    done: issues.filter((i) => i.statusCategory === 'done').length,
-    removed: removed.count,
-  }
+  const total = issues.length
+  const done = issues.filter((i) => i.statusCategory === 'done').length
+  const inProgress = issues.filter((i) => i.statusCategory === 'indeterminate').length
+  const day = new Date(`${todayInWarsaw(now)}T00:00:00Z`)
+  await tx.jiraSnapshot.upsert({
+    where: { versionId_day: { versionId, day } },
+    create: { versionId, day, total, done, inProgress },
+    update: { total, done, inProgress },
+  })
+
+  return { total, done, removed: removed.count }
 }

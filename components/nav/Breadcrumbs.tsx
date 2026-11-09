@@ -13,7 +13,7 @@ export function Breadcrumbs() {
   return (
     <nav
       aria-label="Ścieżka nawigacji"
-      className="mx-auto w-full max-w-6xl px-6 pt-4"
+      className="mx-auto w-full max-w-6xl px-6 pt-5"
     >
       <ol className="flex flex-wrap items-center gap-1.5 text-sm text-muted">
         {crumbs.map((crumb, i) => {

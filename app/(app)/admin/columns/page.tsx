@@ -22,8 +22,8 @@ function TabLink({ tab, current, children }: { tab: Tab; current: Tab; children:
       href={href}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-        active ? 'bg-fg text-bg' : 'text-muted hover:bg-surface-raised hover:text-fg',
+        'rounded-[3px] px-3 py-1.5 text-sm font-medium transition-colors',
+        active ? 'bg-accent text-on-accent' : 'text-muted hover:bg-surface-raised hover:text-fg',
       )}
     >
       {children}
@@ -41,9 +41,9 @@ export default async function ColumnsAdminPage({
   const current: Tab = tab === 'flows' ? 'flows' : 'steps'
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-8">
       <div>
-        <h1 className="text-2xl font-semibold">Konfiguracja kroków i szablony</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Konfiguracja kroków i szablony</h1>
         <p className="mt-1 text-sm text-muted">
           Kroki to konfigurowalne kolumny w tabeli instancji. Szablony (flow)
           grupują kroki i podpinają się do nowych wersji.

@@ -14,9 +14,15 @@ const config: Config = {
       surface: 'var(--surface)',
       'surface-raised': 'var(--surface-raised)',
       border: 'var(--border)',
+      'border-strong': 'var(--border-strong)',
       focus: 'var(--focus)',
       fg: 'var(--text)',
       muted: 'var(--text-muted)',
+      // akcent i sygnał „Telemetria" (UI-2a)
+      accent: 'var(--accent)',
+      'on-accent': 'var(--on-accent)',
+      signal: 'var(--signal)',
+      'on-pass': 'var(--on-pass)',
       // wypełnienia / kropki wskaźnika (sekcja 9.1)
       pass: 'var(--status-pass)',
       warn: 'var(--status-warn)',
@@ -28,8 +34,8 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'ui-monospace', 'monospace'],
+        sans: ['var(--font-sans-a)', 'var(--font-sans-b)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-mono-a)', 'var(--font-mono-b)', 'ui-monospace', 'monospace'],
       },
       keyframes: {
         'check-pop': {

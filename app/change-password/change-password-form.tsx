@@ -16,13 +16,13 @@ export function ChangePasswordForm({ mustChange }: { mustChange: boolean }) {
       <div className="w-full max-w-sm">
         <Wordmark subtitle="Hub przygotowania wydań" className="mb-6" />
 
-        <div className="rounded-lg border border-border bg-surface p-6 shadow-md">
+        <div className="rounded-[4px] border border-border bg-surface p-6 shadow-md">
           <h1 className="mb-1 text-lg font-semibold">Zmiana hasła</h1>
 
           {mustChange ? (
             <p
               role="status"
-              className="mb-5 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-warn-strong"
+              className="mb-5 rounded-[3px] border border-border bg-surface-raised px-3 py-2 text-sm text-warn-strong"
             >
               Musisz zmienić hasło tymczasowe, zanim przejdziesz dalej.
             </p>

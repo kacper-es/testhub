@@ -68,10 +68,10 @@ export default async function VersionsPage({
     value === 'all' ? '/versions' : `/versions?app=${encodeURIComponent(value)}`
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Wersje</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Wersje</h1>
         </div>
         {canEdit && (
           <Link href="/versions/new">
@@ -94,7 +94,7 @@ export default async function VersionsPage({
             : 'Brak wersji dla tego filtra.'}
         </p>
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="grid items-start gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {versions.map((v) => {
             const s = STATUS[v.status]
             return (
@@ -103,7 +103,7 @@ export default async function VersionsPage({
                   <div className="flex items-center gap-3">
                     <Link
                       href={`/versions/${v.id}`}
-                      className="inline-flex items-center gap-2 font-mono text-lg underline"
+                      className="inline-flex items-center gap-2 font-mono text-lg font-bold underline-offset-4 hover:underline"
                     >
                       <AppIcon app={v.application} />
                       {v.name}
@@ -135,7 +135,7 @@ export default async function VersionsPage({
                     </form>
 
                     <details>
-                      <summary className="inline-flex cursor-pointer select-none rounded-md border border-fail-strong px-3 py-2 text-sm font-medium text-fail-strong">
+                      <summary className="inline-flex cursor-pointer select-none rounded-[3px] border border-fail-strong px-3 py-2 text-sm font-medium text-fail-strong">
                         Anuluj…
                       </summary>
                       <form
@@ -147,7 +147,7 @@ export default async function VersionsPage({
                           name="reason"
                           required
                           placeholder="Powód anulowania"
-                          className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
+                          className="rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-fg"
                         />
                         <div>
                           <Button variant="danger" type="submit">

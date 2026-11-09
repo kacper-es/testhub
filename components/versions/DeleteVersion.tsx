@@ -31,7 +31,7 @@ export function DeleteVersion({
           value={typed}
           onChange={(e) => setTyped(e.target.value)}
           autoComplete="off"
-          className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
+          className="rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-fg"
         />
       </label>
       {state.error && (

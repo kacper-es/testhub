@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRolePage } from '@/lib/auth/authz'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { FIELD_LABEL, displayValue } from '@/lib/versions/changelog-labels'
 
 const PAGE_SIZE = 50
 
@@ -13,38 +14,15 @@ const ENTITY_LABEL: Record<string, string> = {
   Version: 'Wersja',
 }
 
-const FIELD_LABEL: Record<string, string> = {
-  status: 'status',
-  manualCounterCurrent: 'licznik: rozwiązane',
-  manualCounterTotal: 'licznik: wszystkie',
-  environmentRestored: 'środowisko odtworzone',
-  dbScriptsInstalled: 'skrypty bazodanowe',
-  backendUpdated: 'backend podbity',
-  testsCompleted: 'testy wykonane',
-  notes: 'notatki',
-  application: 'aplikacja',
-  name: 'nazwa',
-  releaseDate: 'data wydania',
-  jiraVersion: 'wersja Jira',
-  deleted: 'usunięcie wersji',
-  pinned: 'przypięte do wersji',
-}
-
 const fmt = new Intl.DateTimeFormat('pl-PL', {
   dateStyle: 'medium',
   timeStyle: 'short',
   timeZone: 'Europe/Warsaw',
 })
 
-function displayValue(v: string | null): string {
-  if (v == null) return '—'
-  if (v === 'true') return 'tak'
-  if (v === 'false') return 'nie'
-  return v
-}
 
 const input =
-  'rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg'
+  'rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-fg'
 
 type SearchParams = {
   versionId?: string
@@ -128,15 +106,15 @@ export default async function ChangelogPage({
   }
 
   return (
-    <main className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-8">
       <div>
-        <h1 className="text-2xl font-semibold">Log zmian</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Log zmian</h1>
       </div>
 
       {/* Filtry — natywny formularz GET (bez klienta). */}
       <form
         method="get"
-        className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-surface p-4"
+        className="flex flex-wrap items-end gap-3 rounded-[4px] border border-border bg-surface p-4"
       >
         <label className="flex flex-col gap-1">
           <span className="text-xs font-medium text-muted">Wersja</span>

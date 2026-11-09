@@ -21,12 +21,12 @@ export function StatusBadge({
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full border bg-surface px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center gap-1.5 rounded-[3px] border bg-transparent px-2 py-0.5 font-mono text-[11px] font-medium uppercase tracking-wider',
         s.text,
         s.border,
       )}
     >
-      <span className={cn('h-2 w-2 rounded-full', s.dot)} aria-hidden />
+      <span className={cn('h-1.5 w-1.5', s.dot)} aria-hidden />
       {children}
     </span>
   )

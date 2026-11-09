@@ -12,7 +12,7 @@ export function Wordmark({
     <div className={cn('flex flex-col items-center gap-3 text-center', className)}>
       <span
         aria-hidden
-        className="flex h-11 w-11 items-center justify-center rounded-xl bg-fg font-mono text-lg font-bold text-bg"
+        className="flex h-11 w-11 items-center justify-center rounded-[3px] border border-signal font-mono text-lg font-bold text-pass-strong"
       >
         RH
       </span>

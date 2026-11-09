@@ -1,16 +1,17 @@
-import type { Instance, InstanceTestRun } from '@prisma/client'
-import { FlagCheckbox } from '@/components/versions/FlagCheckbox'
+import type { Instance, InstanceTestRun } from "@prisma/client";
+import { FlagCheckbox } from "@/components/versions/FlagCheckbox";
+import { cn } from "@/lib/cn";
 
-type Run = InstanceTestRun & { instance: Instance }
+type Run = InstanceTestRun & { instance: Instance };
 
 // Aktywne kroki (kolumny) wersji — kopie z VersionColumn.
-export type RunColumn = { id: string; name: string }
+export type RunColumn = { id: string; name: string };
 
 // Wartość kroku dla runu, klucz `${runId}:${versionColumnId}` (brak = false).
-export type ValueMap = Map<string, boolean>
+export type ValueMap = Map<string, boolean>;
 
 // Ostatnia zmiana kroku, klucz `${runId}:${versionColumnId}` (z ChangeLog).
-export type LastChangeMap = Map<string, { user: string; when: string }>
+export type LastChangeMap = Map<string, { user: string; when: string }>;
 
 function tooltip(
   runId: string,
@@ -18,8 +19,8 @@ function tooltip(
   base: string,
   lastChanges: LastChangeMap,
 ): string {
-  const last = lastChanges.get(`${runId}:${columnId}`)
-  return last ? `${base}: ${last.user}, ${last.when}` : base
+  const last = lastChanges.get(`${runId}:${columnId}`);
+  return last ? `${base}: ${last.user}, ${last.when}` : base;
 }
 
 function InstanceName({ instance }: { instance: Instance }) {
@@ -30,7 +31,7 @@ function InstanceName({ instance }: { instance: Instance }) {
         <span className="text-xs text-muted">{instance.clientName}</span>
       )}
     </span>
-  )
+  );
 }
 
 // Tabela robocza w podglądzie wersji: instancje × kroki (checkboxy). Podpinanie
@@ -42,22 +43,22 @@ export function InstanceRunsTable({
   disabled,
   lastChanges,
 }: {
-  runs: Run[]
-  columns: RunColumn[]
-  values: ValueMap
-  disabled: boolean
-  lastChanges: LastChangeMap
+  runs: Run[];
+  columns: RunColumn[];
+  values: ValueMap;
+  disabled: boolean;
+  lastChanges: LastChangeMap;
 }) {
   if (runs.length === 0) {
     return (
       <p className="text-sm text-muted">
         Brak podpiętych instancji w tej wersji.
       </p>
-    )
+    );
   }
 
   const isChecked = (runId: string, columnId: string) =>
-    values.get(`${runId}:${columnId}`) ?? false
+    values.get(`${runId}:${columnId}`) ?? false;
 
   return (
     <div className="flex flex-col gap-3">
@@ -71,38 +72,57 @@ export function InstanceRunsTable({
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-border text-left">
-              <th className="px-3 py-2 font-semibold text-muted">Instancja</th>
+            <tr className="border-b border-border text-left font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+              <th className="px-3 py-2 font-medium">Instancja</th>
               {columns.map((c) => (
-                <th
-                  key={c.id}
-                  className="px-2 py-2 text-center font-semibold text-muted"
-                >
+                <th key={c.id} className="px-2 py-2 text-center font-medium">
                   {c.name}
                 </th>
               ))}
+              <th className="px-3 py-2 text-right font-medium">Σ</th>
             </tr>
           </thead>
           <tbody>
-            {runs.map((run) => (
-              <tr key={run.id} className="border-b border-border align-top">
-                <td className="px-3 py-2">
-                  <InstanceName instance={run.instance} />
-                </td>
-                {columns.map((c) => (
-                  <td key={c.id} className="px-2 py-2 text-center">
-                    <FlagCheckbox
-                      runId={run.id}
-                      versionColumnId={c.id}
-                      checked={isChecked(run.id, c.id)}
-                      label={c.name}
-                      tooltip={tooltip(run.id, c.id, c.name, lastChanges)}
-                      disabled={disabled}
-                    />
+            {runs.map((run) => {
+              const count = columns.filter((c) =>
+                isChecked(run.id, c.id),
+              ).length;
+              const full = columns.length > 0 && count === columns.length;
+              return (
+                <tr
+                  key={run.id}
+                  className="border-b border-border align-middle last:border-b-0 hover:bg-surface-raised"
+                >
+                  <td className="px-3 py-2">
+                    <InstanceName instance={run.instance} />
                   </td>
-                ))}
-              </tr>
-            ))}
+                  {columns.map((c) => (
+                    <td key={c.id} className="px-2 py-2 text-center">
+                      <FlagCheckbox
+                        runId={run.id}
+                        versionColumnId={c.id}
+                        checked={isChecked(run.id, c.id)}
+                        label={c.name}
+                        tooltip={tooltip(run.id, c.id, c.name, lastChanges)}
+                        disabled={disabled}
+                      />
+                    </td>
+                  ))}
+                  <td
+                    className={cn(
+                      "px-3 py-2 text-right font-mono text-xs",
+                      full
+                        ? "text-pass-strong"
+                        : count === 0
+                          ? "text-muted"
+                          : "text-fg",
+                    )}
+                  >
+                    {count}/{columns.length}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -112,7 +132,7 @@ export function InstanceRunsTable({
         {runs.map((run) => (
           <div
             key={run.id}
-            className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3"
+            className="flex flex-col gap-3 rounded-[4px] border border-border bg-bg p-3"
           >
             <InstanceName instance={run.instance} />
             {columns.length > 0 && (
@@ -139,5 +159,5 @@ export function InstanceRunsTable({
         ))}
       </div>
     </div>
-  )
+  );
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { cookies } from 'next/headers'
 import './globals.css'
-import { jetbrainsMono, plexSans } from './fonts'
+import { fontVariables } from './fonts'
 import { THEME_COOKIE, themeClass } from '@/lib/theme'
 
 export const metadata: Metadata = {
@@ -20,7 +20,7 @@ export default async function RootLayout({
   return (
     <html
       lang="pl"
-      className={`${plexSans.variable} ${jetbrainsMono.variable} ${cls}`}
+      className={`${fontVariables} ${cls}`}
       suppressHydrationWarning
     >
       <body>{children}</body>

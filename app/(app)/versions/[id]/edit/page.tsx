@@ -64,7 +64,7 @@ export default async function EditVersionPage({
 
   const deleteSection =
     user.role === 'ADMIN' ? (
-      <section className="flex flex-col gap-3 rounded-lg border border-fail-strong p-4">
+      <section className="flex flex-col gap-3 rounded-[4px] border border-fail-strong p-4">
         <div>
           <h2 className="text-lg font-semibold">Usuń wersję</h2>
           <p className="mt-1 text-sm text-muted">
@@ -81,9 +81,9 @@ export default async function EditVersionPage({
   if (version.status !== 'IN_PROGRESS') {
     if (!deleteSection) redirect(`/versions/${id}`)
     return (
-      <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+      <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-8">
         <div>
-          <h1 className="text-2xl font-semibold">Usuń wersję</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Usuń wersję</h1>
           <p className="mt-1 font-mono text-sm text-muted">{version.name}</p>
           <p className="mt-2 text-sm text-muted">
             Wersja jest zamknięta — edycja jest wyłączona, dostępne jest tylko usunięcie.
@@ -195,9 +195,9 @@ export default async function EditVersionPage({
     .map((r) => ({ id: r.task.taskTemplateId, name: r.resolved.name }))
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-8">
       <div>
-        <h1 className="text-2xl font-semibold">Edytuj wersję</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Edytuj wersję</h1>
         <p className="mt-1 font-mono text-sm text-muted">{version.name}</p>
       </div>
       <EditVersionForm
@@ -243,7 +243,7 @@ export default async function EditVersionPage({
         {available.length > 0 && (
           <form
             action={addVersionColumns}
-            className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3"
+            className="flex flex-col gap-3 rounded-[4px] border border-border bg-surface p-3"
           >
             <input type="hidden" name="versionId" value={version.id} />
             <span className="text-sm font-medium">Dodaj kroki z katalogu</span>
@@ -276,7 +276,7 @@ export default async function EditVersionPage({
         {pinnedTasks.length === 0 ? (
           <p className="text-sm text-muted">Brak przypiętych zadań.</p>
         ) : (
-          <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
+          <ul className="flex flex-col divide-y divide-border rounded-[4px] border border-border bg-surface">
             {pinnedTasks.map(({ task, resolved }) => (
               <li key={task.id} className="flex items-center justify-between gap-3 px-4 py-1.5">
                 <span className="text-fg">{resolved.name}</span>

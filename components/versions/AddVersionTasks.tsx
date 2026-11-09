@@ -33,7 +33,7 @@ export function AddVersionTasks({
             name="templateId"
             required
             defaultValue=""
-            className="rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg"
+            className="rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-fg"
           >
             <option value="" disabled>
               Wybierz…

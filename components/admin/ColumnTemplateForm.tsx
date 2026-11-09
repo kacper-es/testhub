@@ -105,7 +105,7 @@ export function ColumnTemplateForm({
       </div>
 
       {available.length > 0 && (
-        <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
+        <div className="flex flex-col gap-2 rounded-[4px] border border-border bg-surface p-3">
           <span className="text-sm font-medium">Dodaj krok do szablonu</span>
           <div className="flex flex-wrap gap-2">
             {available.map((c) => (

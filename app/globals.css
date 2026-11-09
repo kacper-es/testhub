@@ -3,23 +3,30 @@
 @tailwind utilities;
 
 @layer base {
-  /* Jasny motyw (domyślny) + scoped .light */
+  /* UI-2a „Telemetria". Jasny motyw (domyślny) + scoped .light */
   :root,
   .light {
-    --bg: #fafaf7;
-    --surface: #ffffff;
-    --surface-raised: #f2f2ee;
-    --border: #dfdfd8;
-    --text: #1a1d24;
-    --text-muted: #5c6370;
-    --focus: #1f5fbf;
+    --bg: #f2f1ec;
+    --surface: #fbfaf7;
+    --surface-raised: #ecebe5;
+    --border: #d6d4cc;
+    --border-strong: #868a81;
+    --text: #14171c;
+    --text-muted: #555d69;
+    --focus: #1a5fd0;
 
-    --status-pass: #2fa36b;
-    --status-warn: #d9a404;
+    /* Akcent „Telemetria": w jasnym motywie grafit z limonkowym tekstem. */
+    --accent: #1a1f14;
+    --on-accent: #d4f77a;
+    --signal: #5e8a00;
+
+    --status-pass: #5e8a00;
+    --status-warn: #c77700;
     --status-fail: #d9483d;
+    --on-pass: #ffffff;
 
-    --text-pass: #1e7a4c;
-    --text-warn: #8a6300;
+    --text-pass: #3f5e00;
+    --text-warn: #8a5300;
     --text-fail: #b03227;
 
     color-scheme: light;
@@ -27,21 +34,27 @@
 
   /* Ciemny motyw — jawny wybór (klasa .dark na dowolnym elemencie) */
   .dark {
-    --bg: #12151c;
-    --surface: #171b24;
-    --surface-raised: #1e2430;
-    --border: #2a3140;
-    --text: #e6e9ef;
-    --text-muted: #98a1b0;
+    --bg: #0a0c0f;
+    --surface: #111419;
+    --surface-raised: #171b21;
+    --border: #262d36;
+    --border-strong: #5a6472;
+    --text: #e8eaed;
+    --text-muted: #8b95a3;
     --focus: #7fb2ff;
 
-    --status-pass: #2fa36b;
-    --status-warn: #d9a404;
-    --status-fail: #d9483d;
+    --accent: #c8f55a;
+    --on-accent: #0a0c0f;
+    --signal: #c8f55a;
 
-    --text-pass: #2fa36b;
-    --text-warn: #d9a404;
-    --text-fail: #e8695e;
+    --status-pass: #c8f55a;
+    --status-warn: #ffb547;
+    --status-fail: #ff6b5e;
+    --on-pass: #0a0c0f;
+
+    --text-pass: #c8f55a;
+    --text-warn: #ffb547;
+    --text-fail: #ff6b5e;
 
     color-scheme: dark;
   }
@@ -49,28 +62,35 @@
   /* SYSTEM: gdy brak jawnej klasy, idź za preferencją OS */
   @media (prefers-color-scheme: dark) {
     :root:not(.light):not(.dark) {
-      --bg: #12151c;
-      --surface: #171b24;
-      --surface-raised: #1e2430;
-      --border: #2a3140;
-      --text: #e6e9ef;
-      --text-muted: #98a1b0;
+      --bg: #0a0c0f;
+      --surface: #111419;
+      --surface-raised: #171b21;
+      --border: #262d36;
+      --border-strong: #5a6472;
+    --border-strong: #5a6472;
+      --text: #e8eaed;
+      --text-muted: #8b95a3;
       --focus: #7fb2ff;
 
-      --status-pass: #2fa36b;
-      --status-warn: #d9a404;
-      --status-fail: #d9483d;
+      --accent: #c8f55a;
+      --on-accent: #0a0c0f;
+      --signal: #c8f55a;
 
-      --text-pass: #2fa36b;
-      --text-warn: #d9a404;
-      --text-fail: #e8695e;
+      --status-pass: #c8f55a;
+      --status-warn: #ffb547;
+      --status-fail: #ff6b5e;
+      --on-pass: #0a0c0f;
+
+      --text-pass: #c8f55a;
+      --text-warn: #ffb547;
+      --text-fail: #ff6b5e;
 
       color-scheme: dark;
     }
   }
 
   html {
-    font-family: var(--font-sans), system-ui, sans-serif;
+    font-family: var(--font-sans-a), var(--font-sans-b), system-ui, sans-serif;
   }
 
   body {

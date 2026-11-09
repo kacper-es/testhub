@@ -30,7 +30,7 @@ export function ThemeToggle({ current }: { current: Theme }) {
     <div
       role="group"
       aria-label="Motyw"
-      className="inline-flex rounded-md border border-border bg-surface p-0.5"
+      className="inline-flex rounded-[3px] border border-border bg-surface p-0.5 lg:w-full"
     >
       {OPTIONS.map((o) => (
         <button
@@ -40,8 +40,8 @@ export function ThemeToggle({ current }: { current: Theme }) {
           disabled={pending}
           aria-pressed={current === o}
           className={cn(
-            'rounded px-2.5 py-1 text-xs font-medium transition-colors',
-            current === o ? 'bg-fg text-bg' : 'text-fg hover:bg-surface-raised',
+            'flex-1 rounded-[2px] px-2.5 py-1 text-xs font-medium transition-colors',
+            current === o ? 'bg-accent text-on-accent' : 'text-fg hover:bg-surface-raised',
           )}
         >
           {THEME_LABELS[o]}

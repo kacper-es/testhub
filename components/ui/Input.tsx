@@ -9,7 +9,7 @@ import { cn } from '@/lib/cn'
 // Wspólna baza kontrolek formularza — jedyne źródło stylu inputów (tokeny CSS
 // variables, oba motywy). Zastępuje kopiowane po komponentach stringi `field`/`input`.
 const control =
-  'w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg ' +
+  'w-full rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-fg ' +
   'placeholder:text-muted transition-colors'
 
 export function Input({
@@ -49,7 +49,7 @@ export function Field({
 }) {
   return (
     <label className={cn('flex flex-col gap-1', className)}>
-      <span className="text-sm font-medium">
+      <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted">
         {label}
         {optional && <span className="text-muted"> (opcjonalnie)</span>}
       </span>

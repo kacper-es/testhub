@@ -106,7 +106,8 @@ model Version {
   testRuns   InstanceTestRun[]
   comments   VersionComment[]
   columns    VersionColumn[]
-  jiraIssues JiraIssue[]
+  jiraIssues    JiraIssue[]
+  jiraSnapshots JiraSnapshot[]
 
   @@index([status, releaseDate])
   @@index([applicationId])
@@ -332,4 +333,19 @@ model JiraIssue {
 
   @@unique([versionId, jiraId])
   @@index([versionId, removedAt])
+}
+
+// Dzienny stan ticketów wersji (UI-2b, burn-up). Zapis przy każdej synchronizacji,
+// ostatnia synchronizacja danego dnia (strefa Europe/Warsaw) nadpisuje wiersz.
+model JiraSnapshot {
+  id         String   @id @default(cuid())
+  versionId  String
+  day        DateTime @db.Date
+  total      Int
+  done       Int
+  inProgress Int
+
+  version Version @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@unique([versionId, day])
 }

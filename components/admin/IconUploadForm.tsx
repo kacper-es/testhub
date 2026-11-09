@@ -27,7 +27,7 @@ export function IconUploadForm({ id }: { id: string }) {
           name="icon"
           accept={ICON_ACCEPT}
           required
-          className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg file:mr-3 file:rounded-md file:border-0 file:bg-surface-raised file:px-3 file:py-1 file:text-sm file:text-fg"
+          className="w-full rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-fg file:mr-3 file:rounded-[3px] file:border-0 file:bg-surface-raised file:px-3 file:py-1 file:text-sm file:text-fg"
         />
       </Field>
 

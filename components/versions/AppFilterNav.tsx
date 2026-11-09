@@ -20,9 +20,9 @@ export function AppFilterNav({
 
   const chip = (active: boolean) =>
     cn(
-      'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm',
+      'inline-flex items-center gap-1.5 rounded-[3px] border px-3 py-1 text-sm',
       active
-        ? 'border-fg bg-fg text-bg'
+        ? 'border-accent bg-accent text-on-accent'
         : 'border-border bg-surface text-fg hover:bg-surface-raised',
     )
 

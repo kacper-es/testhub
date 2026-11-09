@@ -23,9 +23,9 @@ export default async function JiraAdminPage() {
   const lastRun = lastAutoSyncRun()
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-8">
       <div>
-        <h1 className="text-2xl font-semibold">Jira</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Jira</h1>
         <p className="mt-1 text-sm text-muted">
           Integracja z Jira Cloud — tylko odczyt. Konfiguracja wyłącznie przez zmienne
           środowiskowe.
@@ -86,7 +86,7 @@ export default async function JiraAdminPage() {
             Pojedynczą wersję zsynchronizujesz w jej edycji, w sekcji „Jira&rdquo;.
           </p>
         </div>
-        <div className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm">
+        <div className="flex flex-col gap-1 rounded-[3px] border border-border bg-surface-raised px-3 py-2 text-sm">
           <span className="font-medium text-fg">Automatyczna synchronizacja</span>
           {cfg.status !== 'configured' ? (
             <span className="text-muted">Wyłączona — Jira nieskonfigurowana.</span>

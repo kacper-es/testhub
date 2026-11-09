@@ -124,6 +124,7 @@ describe('applyIssueSync', () => {
         updateMany: vi.fn().mockResolvedValue({ count: 2 }),
       },
       version: { update: vi.fn().mockResolvedValue({}) },
+      jiraSnapshot: { upsert: vi.fn().mockResolvedValue({}) },
     }
     const now = new Date('2026-11-08T12:00:00Z')
     const issues = [mapIssue(raw('1', 'done')), mapIssue(raw('2'))]
@@ -143,6 +144,25 @@ describe('applyIssueSync', () => {
       where: { id: 'v1' },
       data: { jiraSyncedAt: now },
     })
+    // UI-2b: daily snapshot for the burn-up, keyed by the Warsaw date
+    expect(tx.jiraSnapshot.upsert).toHaveBeenCalledWith({
+      where: { versionId_day: { versionId: 'v1', day: new Date('2026-11-08T00:00:00Z') } },
+      create: { versionId: 'v1', day: new Date('2026-11-08T00:00:00Z'), total: 2, done: 1, inProgress: 0 },
+      update: { total: 2, done: 1, inProgress: 0 },
+    })
+  })
+
+  it('snapshot day follows Warsaw time, not UTC', async () => {
+    const tx = {
+      jiraIssue: { upsert: vi.fn(), updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+      version: { update: vi.fn() },
+      jiraSnapshot: { upsert: vi.fn() },
+    }
+    // 23:30 UTC on Nov 8 = 00:30 on Nov 9 in Warsaw
+    await applyIssueSync(tx as never, 'v1', [], new Date('2026-11-08T23:30:00Z'))
+    expect(tx.jiraSnapshot.upsert.mock.calls[0][0].where.versionId_day.day).toEqual(
+      new Date('2026-11-09T00:00:00Z'),
+    )
   })
 })
 

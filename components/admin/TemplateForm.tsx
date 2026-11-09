@@ -68,7 +68,7 @@ export function TemplateForm({
       {lockedTaskType ? (
         <div className="flex flex-col gap-1">
           <span className="text-sm font-medium">Typ zadania</span>
-          <div className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-muted">
+          <div className="w-full rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-muted">
             {TASK_TYPE_LABEL[lockedTaskType]}
           </div>
           <p className="text-xs text-muted">

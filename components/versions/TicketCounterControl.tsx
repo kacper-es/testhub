@@ -50,7 +50,7 @@ export function TicketCounterControl({
   }
 
   const inputCls =
-    'w-16 rounded-md border border-border bg-surface px-2 py-1 text-right font-mono text-sm text-fg'
+    'w-16 rounded-[3px] border border-border-strong bg-bg px-2 py-1 text-right font-mono text-sm text-fg'
 
   return (
     <span className="inline-flex flex-col items-start gap-1">

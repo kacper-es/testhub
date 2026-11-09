@@ -44,15 +44,15 @@ export default async function AdminPage() {
   ]
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-8">
       <div>
-        <h1 className="text-2xl font-semibold">Panel administratora</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Panel administratora</h1>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {sections.map((s) => (
           <Link key={s.href} href={s.href}>
-            <Card className="h-full transition-colors hover:bg-surface-raised">
+            <Card className="h-full transition-colors hover:border-border-strong hover:bg-surface-raised">
               <h2 className="text-lg font-semibold">{s.title}</h2>
               <p className="mt-1 text-sm text-muted">{s.desc}</p>
             </Card>

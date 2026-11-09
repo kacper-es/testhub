@@ -396,7 +396,7 @@ Kontrasty policzyłem, ale **zweryfikuj narzędziem** i popraw, jeśli coś wypa
 ### 9.2 Typografia
 
 - **JetBrains Mono** — dane liczbowe, statusy, liczniki `X/Y`, nazwy wersji, daty. Testerzy czytają logi i konsole, więc to wybór naturalny, nie ozdobny.
-- **IBM Plex Sans** — nagłówki i treść.
+- **Space Grotesk** — nagłówki i treść (od UI-2a; wcześniej IBM Plex Sans). Oba kroje z podzbiorem latin-ext (polskie znaki).
 - **Uwaga wdrożeniowa:** `next/font/google` pobiera fonty w czasie **builda**. Firmowy VM może budować obraz bez dostępu do internetu. Zvenduruj pliki `.woff2` do repo (`/public/fonts`) i użyj `next/font/local`. Załóż brak internetu w czasie builda.
 
 ### 9.3 Element sygnaturowy

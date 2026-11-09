@@ -21,10 +21,10 @@ export default async function TemplatesPage() {
   })
 
   return (
-    <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Szablony zadań</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Szablony zadań</h1>
         </div>
         <Link href="/admin/templates/new">
           <Button variant="primary">Nowy szablon</Button>

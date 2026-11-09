@@ -29,7 +29,7 @@ export function LoginForm({
       <div className="w-full max-w-sm">
         <Wordmark subtitle="Hub przygotowania wydań" className="mb-6" />
 
-        <div className="rounded-lg border border-border bg-surface p-6 shadow-md">
+        <div className="rounded-[4px] border border-border bg-surface p-6 shadow-md">
           <h1 className="mb-1 text-lg font-semibold">Logowanie</h1>
           <p className="mb-5 text-sm text-muted">
             Zaloguj się firmowym adresem email.
@@ -38,7 +38,7 @@ export function LoginForm({
           {insecure && (
             <p
               role="alert"
-              className="mb-4 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-warn-strong"
+              className="mb-4 rounded-[3px] border border-border bg-surface-raised px-3 py-2 text-sm text-warn-strong"
             >
               Strona jest otwarta przez HTTP, a ciasteczko sesji wymaga HTTPS — logowanie nie
               zadziała. Otwórz ją adresem <code>https://</code> albo ustaw{' '}
@@ -49,7 +49,7 @@ export function LoginForm({
           {changed && (
             <p
               role="status"
-              className="mb-4 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm text-pass-strong"
+              className="mb-4 rounded-[3px] border border-border bg-surface-raised px-3 py-2 text-sm text-pass-strong"
             >
               Hasło zostało zmienione. Zaloguj się ponownie.
             </p>

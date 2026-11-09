@@ -15,7 +15,7 @@ const ROLES: { value: Role; label: string }[] = [
 ]
 
 const input =
-  'rounded-md border border-border bg-surface px-3 py-2 text-sm text-fg'
+  'rounded-[3px] border border-border-strong bg-bg px-3 py-2 text-sm text-fg'
 
 export default async function ManageUserPage({
   params,
@@ -30,9 +30,9 @@ export default async function ManageUserPage({
   const isSelf = user.id === admin.id
 
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+    <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6 sm:px-8">
       <div>
-        <h1 className="text-2xl font-semibold">{user.name}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{user.name}</h1>
         <p className="font-mono text-sm text-muted">{user.email}</p>
         <div className="mt-2 flex gap-2">
           {user.isActive ? (
@@ -47,7 +47,7 @@ export default async function ManageUserPage({
       </div>
 
       {isSelf && (
-        <p className="rounded-lg border border-border bg-surface-raised px-4 py-3 text-sm text-muted">
+        <p className="rounded-[4px] border border-border bg-surface-raised px-4 py-3 text-sm text-muted">
           To Twoje konto. Rolę i aktywność może zmienić inny administrator —
           zapobiega to przypadkowemu odcięciu sobie dostępu.
         </p>

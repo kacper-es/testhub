@@ -12,7 +12,7 @@ export function AppNav({ isAdmin }: { isAdmin: boolean }) {
   const items = NAV_ITEMS.filter((item) => !item.adminOnly || isAdmin)
 
   return (
-    <nav aria-label="Główna nawigacja" className="flex flex-wrap items-center gap-1 text-sm">
+    <nav aria-label="Główna nawigacja" className="flex flex-wrap items-center gap-1 text-sm lg:flex-col lg:items-stretch">
       {items.map((item) => {
         const active = isNavItemActive(pathname, item.href)
         return (
@@ -21,9 +21,9 @@ export function AppNav({ isAdmin }: { isAdmin: boolean }) {
             href={item.href}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'rounded-md px-3 py-1.5 font-medium transition-colors',
+              'rounded-[3px] px-3 py-2 font-medium transition-colors',
               active
-                ? 'bg-fg text-bg'
+                ? 'bg-accent text-on-accent'
                 : 'text-muted hover:bg-surface-raised hover:text-fg',
             )}
           >

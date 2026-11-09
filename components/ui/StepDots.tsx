@@ -34,10 +34,10 @@ export function StepDots({
               key={i}
               aria-hidden
               className={cn(
-                'h-2.5 w-2.5 rounded-[3px] border',
+                'h-2.5 w-2.5 rounded-[1px] border',
                 isFilled
-                  ? 'animate-dot-fill border-pass-strong bg-pass'
-                  : 'border-border bg-transparent',
+                  ? 'animate-dot-fill border-pass bg-pass'
+                  : 'border-border-strong bg-transparent',
               )}
               style={
                 isFilled

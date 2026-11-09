@@ -62,7 +62,7 @@ export function NotesField({
         rows={2}
         placeholder="Notatki…"
         aria-label="Notatki instancji"
-        className="w-full min-w-40 rounded-md border border-border bg-surface px-2 py-1 text-sm text-fg"
+        className="w-full min-w-40 rounded-[3px] border border-border-strong bg-bg px-2 py-1 text-sm text-fg"
         onFocus={() => {
           focused.current = true
         }}

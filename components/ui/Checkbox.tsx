@@ -36,11 +36,11 @@ export function Checkbox({
         <span
           aria-hidden
           className={cn(
-            'flex h-5 w-5 items-center justify-center rounded-[5px] border transition-colors',
+            'flex h-5 w-5 items-center justify-center rounded-[3px] border transition-colors',
             'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus',
             checked
-              ? 'animate-check-pop border-pass-strong bg-pass'
-              : 'border-border bg-surface',
+              ? 'animate-check-pop border-pass bg-pass'
+              : 'border-border-strong bg-bg',
           )}
         >
           {checked && (
@@ -48,7 +48,7 @@ export function Checkbox({
               viewBox="0 0 16 16"
               className="h-3.5 w-3.5"
               fill="none"
-              stroke="white"
+              stroke="var(--on-pass)"
               strokeWidth={2.5}
               strokeLinecap="round"
               strokeLinejoin="round"
