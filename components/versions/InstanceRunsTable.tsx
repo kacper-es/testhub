@@ -4,6 +4,11 @@ import { cn } from '@/lib/cn'
 
 type Run = InstanceTestRun & { instance: Instance }
 
+// Column widths (rem): instance name, minimum per step, the Σ column.
+const INSTANCE_COL_REM = 14
+const STEP_COL_MIN_REM = 5.5
+const SUM_COL_REM = 4.5
+
 // Aktywne kroki (kolumny) wersji — kopie z VersionColumn.
 export type RunColumn = { id: string; name: string }
 
@@ -59,14 +64,29 @@ export function InstanceRunsTable({
         <p className="text-sm text-muted">Ta wersja nie ma kroków — dodaj je w edycji wersji.</p>
       )}
 
-      {/* Desktop: tabela (przewija się w swoim kontenerze przy wielu krokach) */}
+      {/* Desktop: tabela (przewija się w swoim kontenerze przy wielu krokach).
+          UI-4: table-fixed — wszystkie kolumny kroków mają tę samą szerokość,
+          niezależnie od długości nazwy (dłuższe nazwy łamią się w nagłówku). */}
       <div className="hidden overflow-x-auto md:block">
-        <table className="w-full border-collapse text-sm">
+        <table
+          className="w-full table-fixed border-collapse text-sm"
+          style={{ minWidth: `${INSTANCE_COL_REM + columns.length * STEP_COL_MIN_REM + SUM_COL_REM}rem` }}
+        >
+          <colgroup>
+            <col style={{ width: `${INSTANCE_COL_REM}rem` }} />
+            {columns.map((c) => (
+              <col key={c.id} />
+            ))}
+            <col style={{ width: `${SUM_COL_REM}rem` }} />
+          </colgroup>
           <thead>
             <tr className="border-b border-border text-left font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
               <th className="px-3 py-2 font-medium">Instancja</th>
               {columns.map((c) => (
-                <th key={c.id} className="px-2 py-2 text-center font-medium">
+                <th
+                  key={c.id}
+                  className="break-words px-1 py-2 text-center align-bottom font-medium leading-tight"
+                >
                   {c.name}
                 </th>
               ))}
@@ -82,7 +102,7 @@ export function InstanceRunsTable({
                   key={run.id}
                   className="border-b border-border align-middle last:border-b-0 hover:bg-surface-raised"
                 >
-                  <td className="px-3 py-2">
+                  <td className="break-words px-3 py-2">
                     <InstanceName instance={run.instance} />
                   </td>
                   {columns.map((c) => (

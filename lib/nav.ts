@@ -1,18 +1,24 @@
 // Konfiguracja nawigacji i budowa okruszków. Czysty moduł (bez next/headers,
 // bez Prismy) — używany przez komponenty klienckie (AppNav, Breadcrumbs).
 
+import type { NavIconName } from '@/components/nav/NavIcon'
+
+// UI-4: collapsed/open state of the desktop sidebar ('collapsed' | 'open').
+export const SIDEBAR_COOKIE = 'sidebar'
+
 export type NavItem = {
   href: string
   label: string
+  icon: NavIconName
   adminOnly?: boolean
 }
 
 // Główna nawigacja w pasku — krótkie etykiety.
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/versions', label: 'Wersje' },
-  { href: '/archive', label: 'Archiwum' },
-  { href: '/admin', label: 'Admin', adminOnly: true },
+  { href: '/', label: 'Dashboard', icon: 'dashboard' },
+  { href: '/versions', label: 'Wersje', icon: 'versions' },
+  { href: '/archive', label: 'Archiwum', icon: 'archive' },
+  { href: '/admin', label: 'Admin', icon: 'admin', adminOnly: true },
 ]
 
 // Sekcja aktywna: dokładne trafienie dla dashboardu, prefiks dla pozostałych.

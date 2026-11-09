@@ -1447,6 +1447,35 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 
 ---
 
+## Krok UI-4 — Równe kolumny kroków, zwijany panel boczny, nowe tła motywów `[x]`
+
+- [x] `InstanceRunsTable`: `table-fixed` + `colgroup` — kolumny kroków mają równą szerokość (instancja 14rem, Σ 4,5rem, krok min. 5,5rem → poziomy scroll w kontenerze przy wielu krokach); długie nazwy łamią się w nagłówku
+- [x] `SidebarFrame` (klient): przycisk „Zwiń menu"/„Rozwiń menu" na dole kolumny, tylko desktop (`lg`); zwinięta kolumna 64 px z ikonami
+- [x] `NavIcon`: 8 ikon jako inline SVG (bez zależności); `NavItem.icon` w `lib/nav.ts`
+- [x] Stan w cookie `sidebar` (`collapsed`/`open`, rok), czytany w `app/(app)/layout.tsx` → serwer renderuje właściwą szerokość, bez mignięcia
+- [x] Neutralne tokeny motywów w `globals.css` (wybór użytkownika): jasny „Neutralny szary" (bg `#e8e9eb`, surface `#f6f6f7`, raised `#dedfe2`, border `#c8cacf`, border-strong `#7a7e86`, text `#15171a`, muted `#4f545c`), ciemny „Ciepły grafit" (bg `#1b1a19`, surface `#232220`, raised `#2c2a28`, border `#3d3a37`, border-strong `#7a746d`, text `#ece9e4`, muted `#a8a29a`). Akcenty palet bez zmian
+
+### Decyzje
+
+- Stan zwinięcia w cookie, nie w bazie — to preferencja przeglądarki (inna szerokość ekranu w pracy/w domu), nie konta. Cookie ustawiane po stronie klienta, nic poufnego.
+- Zwinięta kolumna: logo, ikony nawigacji (nazwa w `title` i `sr-only`), ikona konta → `/settings`, ikona wylogowania. Ukryte: otwarte wersje i przełącznik motywu (jest w Ustawieniach).
+- Telefon bez zmian (pasek u góry, brak przycisku zwijania).
+- Animacja szerokości tylko przy `motion-safe`.
+- Jasny `status-warn` przyciemniony z `#c77700` do `#b36b00` — na ciemniejszym szarym tle stary dawał 2,85:1 (< 3:1).
+
+### Odłożone
+
+- Brak.
+
+### Jak sprawdzić
+
+- `npm run check` ✔, `npx vitest run` 318/318.
+- Docker + przeglądarka: „Zwiń menu" → kolumna 64 px, ikony, brak poziomego scrolla (`scrollWidth == clientWidth`); przeładowanie strony → nadal zwinięta; „Rozwiń menu" → cookie `sidebar=open`.
+- Wersja z 5 krokami o różnej długości nazw: wszystkie kolumny kroków po 88 px (pane 800 px) i 115 px (1600 px).
+- Kolory: `tests/contrast.test.ts` (oba motywy × 5 palet) ✔; podgląd wersji w jasnym i ciemnym motywie.
+
+---
+
 ## Krok UI-2c — Dashboard, listy i reszta stron `[x]`
 
 - [x] `lib/versions/summary.ts` — `summarizeVersion` (zadania z resolveTask, agregaty, T−N, mini oś); karty i KPI z jednego źródła
