@@ -34,6 +34,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   jira: 'Jira',
   columns: 'Konfiguracja kroków',
   flows: 'Szablony',
+  settings: 'Ustawienia',
   new: 'Nowa',
   edit: 'Edycja',
 }

@@ -17,6 +17,7 @@ import {
 } from '@/lib/auth/rate-limit'
 import { changePasswordSchema, loginSchema } from '@/lib/validation/auth'
 import { THEME_COOKIE } from '@/lib/theme'
+import { PALETTE_COOKIE } from '@/lib/palette'
 import { cookieSecure } from '@/lib/auth/cookie'
 import { secureCookieWillBeDropped } from '@/lib/auth/insecure-origin'
 
@@ -75,6 +76,13 @@ export async function login(
   // w server layoucie — brak mrugnięcia po zalogowaniu.
   const jar = await cookies()
   jar.set(THEME_COOKIE, user.theme, {
+    httpOnly: false,
+    sameSite: 'lax',
+    secure: cookieSecure(),
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+  })
+  jar.set(PALETTE_COOKIE, user.palette, {
     httpOnly: false,
     sameSite: 'lax',
     secure: cookieSecure(),

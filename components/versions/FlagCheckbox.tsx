@@ -13,6 +13,7 @@ export function FlagCheckbox({
   label,
   tooltip,
   disabled = false,
+  variant = 'box',
 }: {
   runId: string
   versionColumnId: string
@@ -20,6 +21,7 @@ export function FlagCheckbox({
   label: string
   tooltip?: string
   disabled?: boolean
+  variant?: 'box' | 'cell'
 }) {
   const [optimistic, setOptimistic] = useOptimistic(checked)
   const [, startTransition] = useTransition()
@@ -39,6 +41,7 @@ export function FlagCheckbox({
       label={label}
       hideLabel
       title={tooltip}
+      variant={variant}
     />
   )
 }

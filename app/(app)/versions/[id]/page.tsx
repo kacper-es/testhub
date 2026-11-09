@@ -480,7 +480,8 @@ export default async function VersionDetailPage({
               </span>
             </div>
 
-            {timeline.markers.length > 0 && <ReleaseTimeline timeline={timeline} />}
+            {/* Oś zawsze — także bez terminów zadań (same „dziś" i wydanie). */}
+            <ReleaseTimeline timeline={timeline} />
 
             {rows.length === 0 ? (
               <p className="text-sm text-muted">

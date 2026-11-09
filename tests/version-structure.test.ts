@@ -37,6 +37,7 @@ function user(role: Role): User {
     isActive: true,
     mustChangePassword: false,
     theme: 'SYSTEM',
+    palette: 'LIME',
     createdAt: new Date(),
   }
 }

@@ -1411,6 +1411,42 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 
 ---
 
+## Krok UI-3 — Palety kolorów + poprawki po wdrożeniu UI-2 `[x]`
+
+- [x] Migracja `20261110090000_user_palette`: enum `Palette` (LIME, CYAN, COBALT, MINT, MONO), `User.palette` (domyślnie LIME)
+- [x] `lib/palette.ts`, akcja `setPalette` (każda rola, własne konto, zod), cookie-mirror jak motyw (też przy logowaniu)
+- [x] Tokeny palet w `globals.css` (jasny/ciemny/systemowy), atrybut `data-palette` na `<html>`
+- [x] Strona `/settings` (motyw + paleta z podglądem w barwach każdej palety); link z kolumny bocznej
+- [x] Poprawki: oś do wydania widoczna zawsze (także bez terminów zadań); kroki instancji jako kafle
+      (`Checkbox variant="cell"`) jak na makiecie; dół kolumny bocznej bez poziomego scrolla
+- [x] Test kontrastu dla 5 palet × 2 motywy; `tests/palette.test.ts`
+
+### Decyzje
+
+- Paleta per konto (decyzja użytkownika), jak motyw: `User.palette` = źródło prawdy, cookie = mirror dla layoutu.
+- Paleta zmienia akcent, sygnał, „gotowe" i — w Kobalcie — focus (kolor tekstu zamiast niebieskiego, który
+  myliłby się z akcentem). Ostrzeżenie (bursztyn) i błąd (czerwień) wspólne, dlatego bez palet bursztynowej/czerwonej.
+- LIME w jasnym motywie żywsza: limonkowe wypełnienie akcentu z ciemnym tekstem (wcześniej grafit z
+  limonkowym tekstem); „gotowe"/sygnał nadal oliwkowe (jasna limonka nie daje 3:1 na papierze).
+- Selektory palet działają też na elementach (`[data-palette]` na karcie podglądu), LIME powtarza tokeny bazowe.
+- Oś czasu bez terminów: same „dziś" i wydanie. Romby pojawiają się dla zadań z terminem „dni przed wydaniem".
+- Kafle kroków tylko w tabeli (desktop); na telefonie zostają checkboxy przy nazwach kroków.
+- Przy okazji: `InstanceRunsTable.tsx` wrócił do stylu projektu (wcześniej sformatowany domyślnym prettierem).
+
+### Jak sprawdzić
+
+1. Kolumna boczna → nazwa konta → Ustawienia; wybór palety + „Zapisz paletę" → cała aplikacja w nowym akcencie
+   w obu motywach; po wylogowaniu i zalogowaniu paleta zostaje.
+2. Wersja bez terminów zadań → oś z „dziś" i „release".
+3. Macierz instancji → kafle; klik/spacja przełącza krok.
+4. Kolumna boczna nie przewija się w poziomie.
+
+### Zweryfikowane
+
+- Lokalnie (docker): punkty 1 (Kobalt, jasny), 2, 3, 4. Testy 318/318.
+
+---
+
 ## Krok UI-2c — Dashboard, listy i reszta stron `[x]`
 
 - [x] `lib/versions/summary.ts` — `summarizeVersion` (zadania z resolveTask, agregaty, T−N, mini oś); karty i KPI z jednego źródła

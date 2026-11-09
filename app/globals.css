@@ -15,9 +15,10 @@
     --text-muted: #555d69;
     --focus: #1a5fd0;
 
-    /* Akcent „Telemetria": w jasnym motywie grafit z limonkowym tekstem. */
-    --accent: #1a1f14;
-    --on-accent: #d4f77a;
+    /* Akcent „Telemetria" (paleta LIME): limonkowe wypełnienie z ciemnym tekstem.
+       Sygnał/„gotowe" w jasnym motywie oliwkowe — jasna limonka nie daje 3:1 na papierze. */
+    --accent: #c8f55a;
+    --on-accent: #14171c;
     --signal: #5e8a00;
 
     --status-pass: #5e8a00;
@@ -86,6 +87,170 @@
       --text-fail: #ff6b5e;
 
       color-scheme: dark;
+    }
+  }
+
+  /* UI-3: palety akcentu (per konto: data-palette na <html>; podgląd w ustawieniach:
+     data-palette na dowolnym elemencie). Zmieniają akcent, sygnał, „gotowe" i focus;
+     ostrzeżenie/błąd zostają wspólne. Kobalt: focus w kolorze tekstu (niebieski myliłby
+     się z akcentem). LIME powtarza wartości bazowe — potrzebne do podglądu. */
+  [data-palette='lime'] {
+    --accent: #c8f55a;
+    --on-accent: #14171c;
+    --signal: #5e8a00;
+    --status-pass: #5e8a00;
+    --on-pass: #ffffff;
+    --text-pass: #3f5e00;
+    --focus: #1a5fd0;
+  }
+  .dark[data-palette='lime'],
+  .dark [data-palette='lime'] {
+    --accent: #c8f55a;
+    --on-accent: #0a0c0f;
+    --signal: #c8f55a;
+    --status-pass: #c8f55a;
+    --on-pass: #0a0c0f;
+    --text-pass: #c8f55a;
+    --focus: #7fb2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark)[data-palette='lime'],
+    :root:not(.light):not(.dark) [data-palette='lime'] {
+      --accent: #c8f55a;
+      --on-accent: #0a0c0f;
+      --signal: #c8f55a;
+      --status-pass: #c8f55a;
+      --on-pass: #0a0c0f;
+      --text-pass: #c8f55a;
+      --focus: #7fb2ff;
+    }
+  }
+
+  [data-palette='cyan'] {
+    --accent: #5ee6f5;
+    --on-accent: #0e1a1c;
+    --signal: #00838f;
+    --status-pass: #00838f;
+    --on-pass: #ffffff;
+    --text-pass: #006770;
+    --focus: #1a5fd0;
+  }
+  .dark[data-palette='cyan'],
+  .dark [data-palette='cyan'] {
+    --accent: #5ee6f5;
+    --on-accent: #0a0c0f;
+    --signal: #5ee6f5;
+    --status-pass: #5ee6f5;
+    --on-pass: #0a0c0f;
+    --text-pass: #5ee6f5;
+    --focus: #7fb2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark)[data-palette='cyan'],
+    :root:not(.light):not(.dark) [data-palette='cyan'] {
+      --accent: #5ee6f5;
+      --on-accent: #0a0c0f;
+      --signal: #5ee6f5;
+      --status-pass: #5ee6f5;
+      --on-pass: #0a0c0f;
+      --text-pass: #5ee6f5;
+      --focus: #7fb2ff;
+    }
+  }
+
+  [data-palette='cobalt'] {
+    --accent: #2340ff;
+    --on-accent: #ffffff;
+    --signal: #2340ff;
+    --status-pass: #2340ff;
+    --on-pass: #ffffff;
+    --text-pass: #1f37d9;
+    --focus: #14171c;
+  }
+  .dark[data-palette='cobalt'],
+  .dark [data-palette='cobalt'] {
+    --accent: #7d96ff;
+    --on-accent: #0a0c0f;
+    --signal: #7d96ff;
+    --status-pass: #7d96ff;
+    --on-pass: #0a0c0f;
+    --text-pass: #9aadff;
+    --focus: #e8eaed;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark)[data-palette='cobalt'],
+    :root:not(.light):not(.dark) [data-palette='cobalt'] {
+      --accent: #7d96ff;
+      --on-accent: #0a0c0f;
+      --signal: #7d96ff;
+      --status-pass: #7d96ff;
+      --on-pass: #0a0c0f;
+      --text-pass: #9aadff;
+      --focus: #e8eaed;
+    }
+  }
+
+  [data-palette='mint'] {
+    --accent: #3ff2a6;
+    --on-accent: #0c1a14;
+    --signal: #00875a;
+    --status-pass: #00875a;
+    --on-pass: #ffffff;
+    --text-pass: #006b47;
+    --focus: #1a5fd0;
+  }
+  .dark[data-palette='mint'],
+  .dark [data-palette='mint'] {
+    --accent: #3ff2a6;
+    --on-accent: #0a0c0f;
+    --signal: #3ff2a6;
+    --status-pass: #3ff2a6;
+    --on-pass: #0a0c0f;
+    --text-pass: #3ff2a6;
+    --focus: #7fb2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark)[data-palette='mint'],
+    :root:not(.light):not(.dark) [data-palette='mint'] {
+      --accent: #3ff2a6;
+      --on-accent: #0a0c0f;
+      --signal: #3ff2a6;
+      --status-pass: #3ff2a6;
+      --on-pass: #0a0c0f;
+      --text-pass: #3ff2a6;
+      --focus: #7fb2ff;
+    }
+  }
+
+  [data-palette='mono'] {
+    --accent: #14171c;
+    --on-accent: #fbfaf7;
+    --signal: #14171c;
+    --status-pass: #14171c;
+    --on-pass: #ffffff;
+    --text-pass: #14171c;
+    --focus: #1a5fd0;
+  }
+  .dark[data-palette='mono'],
+  .dark [data-palette='mono'] {
+    --accent: #e8eaed;
+    --on-accent: #0a0c0f;
+    --signal: #e8eaed;
+    --status-pass: #e8eaed;
+    --on-pass: #0a0c0f;
+    --text-pass: #e8eaed;
+    --focus: #7fb2ff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not(.light):not(.dark)[data-palette='mono'],
+    :root:not(.light):not(.dark) [data-palette='mono'] {
+      --accent: #e8eaed;
+      --on-accent: #0a0c0f;
+      --signal: #e8eaed;
+      --status-pass: #e8eaed;
+      --on-pass: #0a0c0f;
+      --text-pass: #e8eaed;
+      --focus: #7fb2ff;
     }
   }
 

@@ -19,6 +19,15 @@ enum Theme {
   SYSTEM
 }
 
+// Paleta akcentu interfejsu (UI-3) — wybór per konto, jak motyw.
+enum Palette {
+  LIME
+  CYAN
+  COBALT
+  MINT
+  MONO
+}
+
 enum VersionStatus {
   IN_PROGRESS
   RELEASED
@@ -57,6 +66,7 @@ model User {
   isActive           Boolean  @default(true)
   mustChangePassword Boolean  @default(true)
   theme              Theme    @default(SYSTEM)
+  palette            Palette  @default(LIME)
   createdAt          DateTime @default(now())
 
   sessions              Session[]

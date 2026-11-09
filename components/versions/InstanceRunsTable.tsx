@@ -1,17 +1,17 @@
-import type { Instance, InstanceTestRun } from "@prisma/client";
-import { FlagCheckbox } from "@/components/versions/FlagCheckbox";
-import { cn } from "@/lib/cn";
+import type { Instance, InstanceTestRun } from '@prisma/client'
+import { FlagCheckbox } from '@/components/versions/FlagCheckbox'
+import { cn } from '@/lib/cn'
 
-type Run = InstanceTestRun & { instance: Instance };
+type Run = InstanceTestRun & { instance: Instance }
 
 // Aktywne kroki (kolumny) wersji — kopie z VersionColumn.
-export type RunColumn = { id: string; name: string };
+export type RunColumn = { id: string; name: string }
 
 // Wartość kroku dla runu, klucz `${runId}:${versionColumnId}` (brak = false).
-export type ValueMap = Map<string, boolean>;
+export type ValueMap = Map<string, boolean>
 
 // Ostatnia zmiana kroku, klucz `${runId}:${versionColumnId}` (z ChangeLog).
-export type LastChangeMap = Map<string, { user: string; when: string }>;
+export type LastChangeMap = Map<string, { user: string; when: string }>
 
 function tooltip(
   runId: string,
@@ -19,19 +19,17 @@ function tooltip(
   base: string,
   lastChanges: LastChangeMap,
 ): string {
-  const last = lastChanges.get(`${runId}:${columnId}`);
-  return last ? `${base}: ${last.user}, ${last.when}` : base;
+  const last = lastChanges.get(`${runId}:${columnId}`)
+  return last ? `${base}: ${last.user}, ${last.when}` : base
 }
 
 function InstanceName({ instance }: { instance: Instance }) {
   return (
     <span className="flex flex-col">
       <span className="font-medium text-fg">{instance.name}</span>
-      {instance.clientName && (
-        <span className="text-xs text-muted">{instance.clientName}</span>
-      )}
+      {instance.clientName && <span className="text-xs text-muted">{instance.clientName}</span>}
     </span>
-  );
+  )
 }
 
 // Tabela robocza w podglądzie wersji: instancje × kroki (checkboxy). Podpinanie
@@ -43,29 +41,22 @@ export function InstanceRunsTable({
   disabled,
   lastChanges,
 }: {
-  runs: Run[];
-  columns: RunColumn[];
-  values: ValueMap;
-  disabled: boolean;
-  lastChanges: LastChangeMap;
+  runs: Run[]
+  columns: RunColumn[]
+  values: ValueMap
+  disabled: boolean
+  lastChanges: LastChangeMap
 }) {
   if (runs.length === 0) {
-    return (
-      <p className="text-sm text-muted">
-        Brak podpiętych instancji w tej wersji.
-      </p>
-    );
+    return <p className="text-sm text-muted">Brak podpiętych instancji w tej wersji.</p>
   }
 
-  const isChecked = (runId: string, columnId: string) =>
-    values.get(`${runId}:${columnId}`) ?? false;
+  const isChecked = (runId: string, columnId: string) => values.get(`${runId}:${columnId}`) ?? false
 
   return (
     <div className="flex flex-col gap-3">
       {columns.length === 0 && (
-        <p className="text-sm text-muted">
-          Ta wersja nie ma kroków — dodaj je w edycji wersji.
-        </p>
+        <p className="text-sm text-muted">Ta wersja nie ma kroków — dodaj je w edycji wersji.</p>
       )}
 
       {/* Desktop: tabela (przewija się w swoim kontenerze przy wielu krokach) */}
@@ -84,10 +75,8 @@ export function InstanceRunsTable({
           </thead>
           <tbody>
             {runs.map((run) => {
-              const count = columns.filter((c) =>
-                isChecked(run.id, c.id),
-              ).length;
-              const full = columns.length > 0 && count === columns.length;
+              const count = columns.filter((c) => isChecked(run.id, c.id)).length
+              const full = columns.length > 0 && count === columns.length
               return (
                 <tr
                   key={run.id}
@@ -97,7 +86,7 @@ export function InstanceRunsTable({
                     <InstanceName instance={run.instance} />
                   </td>
                   {columns.map((c) => (
-                    <td key={c.id} className="px-2 py-2 text-center">
+                    <td key={c.id} className="px-1 py-1.5 text-center">
                       <FlagCheckbox
                         runId={run.id}
                         versionColumnId={c.id}
@@ -105,23 +94,20 @@ export function InstanceRunsTable({
                         label={c.name}
                         tooltip={tooltip(run.id, c.id, c.name, lastChanges)}
                         disabled={disabled}
+                        variant="cell"
                       />
                     </td>
                   ))}
                   <td
                     className={cn(
-                      "px-3 py-2 text-right font-mono text-xs",
-                      full
-                        ? "text-pass-strong"
-                        : count === 0
-                          ? "text-muted"
-                          : "text-fg",
+                      'px-3 py-2 text-right font-mono text-xs',
+                      full ? 'text-pass-strong' : count === 0 ? 'text-muted' : 'text-fg',
                     )}
                   >
                     {count}/{columns.length}
                   </td>
                 </tr>
-              );
+              )
             })}
           </tbody>
         </table>
@@ -138,10 +124,7 @@ export function InstanceRunsTable({
             {columns.length > 0 && (
               <div className="flex flex-col gap-2">
                 {columns.map((c) => (
-                  <div
-                    key={c.id}
-                    className="flex items-center justify-between gap-3"
-                  >
+                  <div key={c.id} className="flex items-center justify-between gap-3">
                     <span className="text-sm text-muted">{c.name}</span>
                     <FlagCheckbox
                       runId={run.id}
@@ -159,5 +142,5 @@ export function InstanceRunsTable({
         ))}
       </div>
     </div>
-  );
+  )
 }

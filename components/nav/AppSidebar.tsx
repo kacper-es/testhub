@@ -30,7 +30,7 @@ export function AppSidebar({
   openVersions: SidebarVersion[]
 }) {
   return (
-    <aside className="z-40 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border bg-bg px-4 py-3 lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:flex-nowrap lg:items-stretch lg:gap-7 lg:overflow-y-auto lg:border-b-0 lg:border-r lg:px-4 lg:py-6">
+    <aside className="z-40 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-border bg-bg px-4 py-3 lg:sticky lg:top-0 lg:h-screen lg:w-60 lg:shrink-0 lg:flex-col lg:flex-nowrap lg:items-stretch lg:gap-7 lg:overflow-y-auto lg:overflow-x-hidden lg:border-b-0 lg:border-r lg:px-4 lg:py-6">
       <Link href="/" aria-label="Strona główna" className="flex items-center gap-2.5 rounded-[3px]">
         <span
           aria-hidden
@@ -64,18 +64,24 @@ export function AppSidebar({
         </div>
       )}
 
-      <div className="ml-auto flex flex-wrap items-center gap-3 lg:ml-0 lg:mt-auto lg:flex-col lg:items-stretch">
+      <div className="ml-auto flex flex-wrap items-center gap-2 lg:ml-0 lg:mt-auto lg:flex-col lg:flex-nowrap lg:items-stretch">
         <ThemeToggle current={user.theme} />
-        <div className="flex items-center justify-between gap-3">
-          <span className="hidden min-w-0 truncate text-sm text-muted sm:inline">
-            {user.name} <span className="font-mono text-[11px]">· {user.role}</span>
+        {/* UI-3: konto → ustawienia (motyw, paleta); nazwa skracana, bez poziomego scrolla */}
+        <Link
+          href="/settings"
+          title="Ustawienia konta"
+          className="flex min-w-0 items-center justify-between gap-2 rounded-[3px] px-2 py-1.5 text-sm hover:bg-surface-raised"
+        >
+          <span className="min-w-0 truncate text-fg">{user.name}</span>
+          <span className="shrink-0 font-mono text-[10px] uppercase tracking-wider text-muted">
+            {user.role} ›
           </span>
-          <form action={logout}>
-            <Button variant="secondary" type="submit" className="min-h-9 px-3">
-              Wyloguj
-            </Button>
-          </form>
-        </div>
+        </Link>
+        <form action={logout} className="lg:w-full">
+          <Button variant="secondary" type="submit" className="min-h-9 w-full px-3">
+            Wyloguj
+          </Button>
+        </form>
       </div>
     </aside>
   )

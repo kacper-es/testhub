@@ -29,7 +29,38 @@ function ratio(a: string, b: string): number {
 
 const themes = { light: block(':root,\n  .light {'), dark: block('.dark {') }
 
-describe.each(Object.entries(themes))('contrast — %s theme', (_name, t) => {
+// UI-3: every palette × theme, palette overrides merged onto the base tokens.
+const PALETTES = ['lime', 'cyan', 'cobalt', 'mint', 'mono']
+const variants: [string, Record<string, string>][] = PALETTES.flatMap(
+  (p): [string, Record<string, string>][] => [
+    [`${p} / light`, { ...themes.light, ...block(`[data-palette='${p}'] {`) }],
+    [`${p} / dark`, { ...themes.dark, ...block(`.dark [data-palette='${p}'] {`) }],
+  ],
+)
+
+it('palette blocks exist and override the accent', () => {
+  for (const p of PALETTES) {
+    expect(block(`[data-palette='${p}'] {`)['accent']).toBeDefined()
+    expect(block(`.dark [data-palette='${p}'] {`)['accent']).toBeDefined()
+  }
+})
+
+it('lime palette repeats the base tokens (used by the settings preview)', () => {
+  for (const [k, v] of Object.entries(block(`[data-palette='lime'] {`))) {
+    expect(themes.light[k]).toBe(v)
+  }
+  for (const [k, v] of Object.entries(block(`.dark [data-palette='lime'] {`))) {
+    expect(themes.dark[k]).toBe(v)
+  }
+})
+
+it.each(PALETTES)('system dark for %s matches its explicit dark block', (p) => {
+  expect(block(`:root:not(.light):not(.dark) [data-palette='${p}'] {`)).toEqual(
+    block(`.dark [data-palette='${p}'] {`),
+  )
+})
+
+describe.each([...Object.entries(themes), ...variants])('contrast — %s', (_name, t) => {
   it('parsed the tokens', () => {
     expect(Object.keys(t).length).toBeGreaterThan(15)
   })
