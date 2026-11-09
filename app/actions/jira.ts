@@ -9,8 +9,7 @@ import { getMyself, getProject, getProjectVersions, JiraError } from '@/lib/jira
 import { assertVersionEditable } from '@/lib/versions/guard'
 import { logChange } from '@/lib/versions/log-change'
 import { applicationJiraSchema, jiraSyncSchema, versionJiraSchema } from '@/lib/validation/jira'
-import { fetchFixVersionIssues, TooManyIssuesError } from '@/lib/jira/issues'
-import { applyIssueSync } from '@/lib/jira/sync'
+import { syncAllOpenVersions, syncErrorMessage, syncOneVersion } from '@/lib/jira/sync-version'
 
 export type JiraTestState =
   | { status: 'idle' }
@@ -242,47 +241,6 @@ export type JiraSyncState =
   | { status: 'ok'; total: number; done: number; removed: number }
   | { status: 'error'; error: string }
 
-class SyncAbortedError extends Error {}
-
-// Pełna synchronizacja jednej wersji: najpierw całe pobranie z Jiry (poza
-// transakcją), potem zapis w jednej transakcji. Błąd pobierania = zero zmian.
-async function syncOneVersion(
-  versionId: string,
-  config: JiraConfig,
-): Promise<{ total: number; done: number; removed: number }> {
-  const version = await prisma.version.findUnique({
-    where: { id: versionId },
-    select: { status: true, jiraVersionId: true },
-  })
-  if (!version) throw new SyncAbortedError('Nie znaleziono wersji.')
-  if (version.status !== 'IN_PROGRESS') {
-    throw new SyncAbortedError('Wersja jest zamknięta — synchronizacja tylko dla otwartych.')
-  }
-  if (!version.jiraVersionId) {
-    throw new SyncAbortedError('Wersja nie jest podpięta do wersji Jira.')
-  }
-  const jiraVersionId = version.jiraVersionId
-
-  const issues = await fetchFixVersionIssues(config, jiraVersionId)
-
-  return prisma.$transaction(async (tx) => {
-    // Ponowny odczyt — w trakcie pobierania wersja mogła zostać zamknięta lub przepięta.
-    const current = await tx.version.findUnique({
-      where: { id: versionId },
-      select: { status: true, jiraVersionId: true },
-    })
-    if (!current || current.status !== 'IN_PROGRESS' || current.jiraVersionId !== jiraVersionId) {
-      throw new SyncAbortedError('Wersja zmieniła się w trakcie synchronizacji — spróbuj ponownie.')
-    }
-    return applyIssueSync(tx, versionId, issues, new Date())
-  })
-}
-
-function syncErrorMessage(err: unknown): string {
-  if (err instanceof SyncAbortedError || err instanceof TooManyIssuesError) return err.message
-  return jiraErrorMessage(err)
-}
-
 // „Synchronizuj teraz" w edycji wersji — tylko ADMIN.
 export async function syncVersionJiraIssues(
   _prev: JiraSyncState,
@@ -326,26 +284,11 @@ export async function syncAllOpenJiraVersions(
   const cfg = jiraConfigOrError()
   if ('error' in cfg) return { status: 'error', error: cfg.error }
 
-  const versions = await prisma.version.findMany({
-    where: { status: 'IN_PROGRESS', jiraVersionId: { not: null } },
-    orderBy: { releaseDate: 'asc' },
-    select: { id: true, name: true },
-  })
-
-  const results: { name: string; ok: boolean; message: string }[] = []
-  for (const v of versions) {
-    try {
-      const s = await syncOneVersion(v.id, cfg.config)
-      results.push({ name: v.name, ok: true, message: syncSummaryText(s) })
-      revalidatePath(`/versions/${v.id}`)
-    } catch (err) {
-      results.push({ name: v.name, ok: false, message: syncErrorMessage(err) })
-    }
+  const results = await syncAllOpenVersions(cfg.config)
+  for (const r of results) if (r.ok) revalidatePath(`/versions/${r.versionId}`)
+  return {
+    status: 'done',
+    results: results.map(({ name, ok, message }) => ({ name, ok, message })),
   }
-  return { status: 'done', results }
 }
 
-function syncSummaryText(s: { total: number; done: number; removed: number }): string {
-  const base = `${s.total} ticketów, ${s.done} gotowych`
-  return s.removed > 0 ? `${base}, ${s.removed} wyjętych z wersji` : base
-}

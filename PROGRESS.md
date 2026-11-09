@@ -1098,11 +1098,11 @@ do zakresu w `CLAUDE.md` i `PROMPT-release-hub-mvp.md`.
 - [x] **J-4** Widok ticketów w wersji + `TICKET_AGGREGATE` liczony z Jiry (Done / wszystkie).
 - [ ] **J-5** Pola własne: pobranie definicji (`/rest/api/3/field`), wybór przez admina,
   zapis wartości (JSONB), wyświetlanie. **Czeka na listę pól od użytkownika.**
-- [ ] **J-6** Automatyczna synchronizacja co N minut.
+- [x] **J-6** Automatyczna synchronizacja co N minut.
 
 ### Pytania otwarte
 - Pola własne: które i do czego (tylko wyświetlanie czy też filtrowanie/liczenie) — przed J-5.
-- J-6: mechanizm harmonogramu (timer w procesie aplikacji vs zewnętrzny cron) i interwał.
+- ~~J-6: mechanizm harmonogramu i interwał~~ → rozstrzygnięte w J-6 (timer w procesie, 30 min).
 
 ---
 
@@ -1408,6 +1408,46 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 
 - Lokalnie (docker): punkty 1–3 (40 testowych ticketów wstawionych ręcznie i usuniętych).
   Punkt 4 niesprawdzony — brak zamkniętej wersji w lokalnej bazie.
+
+---
+
+## Krok J-6 + health 503 `[x]`
+
+- [x] `lib/jira/sync-version.ts` — wspólna synchronizacja (przeniesiona z `app/actions/jira.ts`)
+- [x] `lib/jira/auto-sync.ts` — timer w procesie, start z `instrumentation.ts`
+- [x] Panel admina → Jira: interwał i wynik ostatniego automatycznego przebiegu
+- [x] `/health` jako route handler: 200 / 503
+- [x] `JIRA_SYNC_INTERVAL_MINUTES` w compose, stacku, `.env.example`, README
+
+### Decyzje
+
+- Timer w procesie aplikacji (nie cron/osobny serwis). Interwał `JIRA_SYNC_INTERVAL_MINUTES`:
+  puste = 30, `0` = wyłączona, 1–1440; inna wartość = wyłączona + ostrzeżenie w logu i w panelu.
+  Bez skonfigurowanej Jiry timer nie startuje. Pierwszy przebieg minutę po starcie.
+- `pg_try_advisory_xact_lock` w transakcji trzymającej tylko blokadę (timeout 30 min) — jeden
+  automatyczny przebieg naraz, także przy nakładających się kontenerach. Zajęta blokada = pominięcie.
+  Ręczne „Synchronizuj" nie bierze blokady (zbieżny przebieg jest bezpieczny, najwyżej błąd jednej wersji).
+- Bez `revalidatePath` w automacie — strony wersji są dynamiczne i odpytywane co 5 s.
+- Stan ostatniego przebiegu w pamięci (`globalThis`, bo instrumentation i strony mają osobne
+  instancje modułów) — po restarcie „jeszcze się nie odbyła". Bez zapisu w bazie.
+- Logi: liczba wersji i błędy per wersja (komunikaty jak w UI, bez sekretów); nieoczekiwany
+  wyjątek logowany bez treści.
+- `/health` publiczny bez `requireRole` (świadomie: brak danych, tylko stan bazy). Treść nadal
+  zawiera `OK</p>`, więc stary healthcheck z grepem działa z nowym obrazem. W `docker-stack.yml`
+  healthcheck to teraz sam `wget` (kończy się błędem przy 503).
+
+### Jak sprawdzić
+
+1. Jira skonfigurowana → w logach `Jira auto-sync every 30 min.`, po minucie
+   `Jira auto-sync: N version(s), 0 failed.`
+2. Panel admina → Jira → „Automatyczna synchronizacja": interwał i „Ostatnio …".
+3. `JIRA_SYNC_INTERVAL_MINUTES=0` → panel „Wyłączona"; `abc` → komunikat o błędnej wartości.
+4. `curl -i http://localhost:3000/health` → 200; po `docker compose stop db` → 503.
+
+### Zweryfikowane
+
+- Lokalnie (docker, Jira z fikcyjnym adresem i 0 podpiętych wersji, interwał 1 min): punkty 1, 2, 4.
+  Testy 126/126. Synchronizacja z prawdziwą Jirą przez timer — do sprawdzenia na produkcji.
 
 ---
 

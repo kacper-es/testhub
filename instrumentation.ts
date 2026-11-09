@@ -11,4 +11,7 @@ export async function register() {
         'it must be changed on first login.',
     )
   }
+
+  const { startAutoSync } = await import('@/lib/jira/auto-sync')
+  startAutoSync()
 }

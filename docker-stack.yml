@@ -44,15 +44,16 @@ services:
       JIRA_BASE_URL: ${JIRA_BASE_URL:-}
       JIRA_EMAIL: ${JIRA_EMAIL:-}
       JIRA_API_TOKEN: ${JIRA_API_TOKEN:-}
+      # Ticket auto-sync interval in minutes; empty = 30, 0 = off.
+      JIRA_SYNC_INTERVAL_MINUTES: ${JIRA_SYNC_INTERVAL_MINUTES:-}
     ports:
       # Routing mesh: reachable on this port on every node (reverse proxy target).
       - "${RELEASEHUB_PORT:-3000}:3000"
     # Swarm ignores depends_on: if the app starts before the database, the
     # migration fails, the container exits and is restarted until `db` is up.
     healthcheck:
-      # /health answers 200 even when the database is down — check the body.
-      # React renders "Baza: <!-- -->OK</p>", so match the end of the paragraph.
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health | grep -q 'OK</p>'"]
+      # /health answers 503 when the database is down; wget fails on non-2xx.
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:3000/health"]
       interval: 15s
       timeout: 5s
       retries: 3

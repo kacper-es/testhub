@@ -12,7 +12,7 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)
-![tests](https://img.shields.io/badge/testy-116%20passing-3B6D11?style=flat-square)
+![tests](https://img.shields.io/badge/testy-126%20passing-3B6D11?style=flat-square)
 
 [Specyfikacja](PROMPT-release-hub-mvp.md) ·
 [Reguły projektu](CLAUDE.md) ·
@@ -53,7 +53,7 @@ docker compose up --build
 ```
 
 - Aplikacja → **http://localhost:3000**
-- Health check bazy → **http://localhost:3000/health** → „Baza: OK"
+- Health check bazy → **http://localhost:3000/health** → „Baza: OK" (HTTP 200; gdy baza nie odpowiada — 503)
 
 Postgres trzyma dane w named volume `pgdata` — przetrwają `docker compose down`.
 
@@ -66,6 +66,7 @@ Postgres trzyma dane w named volume `pgdata` — przetrwają `docker compose dow
 | `COOKIE_SECURE` | Puste = cookie z flagą `secure` (wymaga HTTPS). `false` tylko przy serwowaniu po zwykłym HTTP |
 | `DATABASE_URL` | Tylko dla lokalnych narzędzi (host `localhost`); w kontenerze nadpisywany na host `db` |
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Opcjonalne — puste = integracja nieskonfigurowana |
+| `JIRA_SYNC_INTERVAL_MINUTES` | Automatyczna synchronizacja ticketów co N minut (1–1440); puste = 30, `0` = wyłączona |
 
 ## 🏢 Wdrożenie (Docker Swarm + Portainer)
 

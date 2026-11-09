@@ -3,6 +3,13 @@ import { readJiraConfig, JIRA_ENV_VARS } from '@/lib/jira/config'
 import { Card } from '@/components/ui/Card'
 import { JiraConnectionTest } from '@/components/admin/JiraConnectionTest'
 import { JiraSyncAll } from '@/components/admin/JiraSyncAll'
+import { lastAutoSyncRun, readSyncInterval } from '@/lib/jira/auto-sync'
+
+const runFmt = new Intl.DateTimeFormat('pl-PL', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Europe/Warsaw',
+})
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +19,8 @@ export default async function JiraAdminPage() {
   // Konfiguracja czytana na serwerze; do klienta trafia tylko adres i e-mail,
   // token wyłącznie jako „ustawiony".
   const cfg = readJiraConfig()
+  const interval = readSyncInterval()
+  const lastRun = lastAutoSyncRun()
 
   return (
     <main className="mx-auto flex max-w-4xl flex-col gap-6 p-6">
@@ -76,6 +85,43 @@ export default async function JiraAdminPage() {
             Pobiera tickety z podpiętych wersji Jira (fixVersion) do wszystkich otwartych wersji.
             Pojedynczą wersję zsynchronizujesz w jej edycji, w sekcji „Jira&rdquo;.
           </p>
+        </div>
+        <div className="flex flex-col gap-1 rounded-md border border-border bg-surface-raised px-3 py-2 text-sm">
+          <span className="font-medium text-fg">Automatyczna synchronizacja</span>
+          {cfg.status !== 'configured' ? (
+            <span className="text-muted">Wyłączona — Jira nieskonfigurowana.</span>
+          ) : interval.status === 'off' ? (
+            <span className="text-muted">
+              Wyłączona (<code>JIRA_SYNC_INTERVAL_MINUTES=0</code>).
+            </span>
+          ) : interval.status === 'invalid' ? (
+            <span role="alert" className="text-fail-strong">
+              Wyłączona — nieprawidłowa wartość <code>JIRA_SYNC_INTERVAL_MINUTES</code>{' '}
+              („{interval.raw}&rdquo;). Dozwolone: 0 (wyłączona) lub 1–1440 minut.
+            </span>
+          ) : (
+            <>
+              <span className="text-muted">
+                Co {interval.minutes} min (<code>JIRA_SYNC_INTERVAL_MINUTES</code>), pierwsza
+                minutę po starcie aplikacji.
+              </span>
+              {!lastRun ? (
+                <span className="text-muted">Od startu aplikacji jeszcze się nie odbyła.</span>
+              ) : lastRun.skipped ? (
+                <span className="text-muted">
+                  Ostatnio {runFmt.format(lastRun.finishedAt)}: pominięta (trwała inna synchronizacja).
+                </span>
+              ) : (
+                <span className={lastRun.failed.length > 0 ? 'text-fail-strong' : 'text-muted'}>
+                  Ostatnio {runFmt.format(lastRun.finishedAt)}: {lastRun.versions} wersji
+                  {lastRun.failed.length > 0
+                    ? `, błędy: ${lastRun.failed.map((f) => `${f.name} — ${f.message}`).join('; ')}`
+                    : ', bez błędów'}
+                  .
+                </span>
+              )}
+            </>
+          )}
         </div>
         <JiraSyncAll disabled={cfg.status !== 'configured'} />
       </Card>
