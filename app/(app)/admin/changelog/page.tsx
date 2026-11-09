@@ -27,6 +27,7 @@ const FIELD_LABEL: Record<string, string> = {
   releaseDate: 'data wydania',
   jiraVersion: 'wersja Jira',
   deleted: 'usunięcie wersji',
+  pinned: 'przypięte do wersji',
 }
 
 const fmt = new Intl.DateTimeFormat('pl-PL', {

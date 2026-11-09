@@ -42,7 +42,7 @@ export async function setCheckboxTaskStatus(
     where: { id: versionTaskId },
     include: { version: { select: { status: true } }, taskTemplate: true },
   })
-  if (!task) return { error: 'Nie znaleziono zadania' }
+  if (!task || task.excludedAt !== null) return { error: 'Nie znaleziono zadania' }
   assertVersionEditable(task.version.status)
   if (task.taskTemplate.taskType !== 'CHECKBOX') {
     return { error: 'To zadanie nie jest ręcznym checkboxem' }
@@ -92,7 +92,7 @@ export async function setTicketCounters(
       taskTemplate: true,
     },
   })
-  if (!task) return { error: 'Nie znaleziono zadania' }
+  if (!task || task.excludedAt !== null) return { error: 'Nie znaleziono zadania' }
   assertVersionEditable(task.version.status)
   if (task.taskTemplate.taskType !== 'TICKET_AGGREGATE') {
     return { error: 'To zadanie nie jest licznikiem ticketów' }

@@ -10,7 +10,6 @@ import {
 } from '@/lib/versions/aggregates'
 import { resolveDeadline, toDateOnly } from '@/lib/versions/deadline'
 import { TASK_STATUS_META } from '@/lib/versions/task-status'
-import { Card } from '@/components/ui/Card'
 import { StatusBadge, type BadgeStatus } from '@/components/ui/StatusBadge'
 import { StepDots } from '@/components/ui/StepDots'
 import { CheckboxTaskControl } from '@/components/versions/CheckboxTaskControl'
@@ -23,7 +22,6 @@ import {
 import { CommentForm } from '@/components/versions/CommentForm'
 import { readJiraConfig } from '@/lib/jira/config'
 import { ticketTaskView } from '@/lib/versions/ticket-source'
-import { DeleteVersion } from '@/components/versions/DeleteVersion'
 import Link from 'next/link'
 import { AppIcon } from '@/components/versions/AppIcon'
 import { Button } from '@/components/ui/Button'
@@ -125,7 +123,7 @@ export default async function VersionDetailPage({
   const version = await prisma.version.findUnique({
     where: { id },
     include: {
-      tasks: { include: { taskTemplate: true } },
+      tasks: { where: { excludedAt: null }, include: { taskTemplate: true } },
       testRuns: {
         include: { instance: true, values: true },
         orderBy: { instance: { name: 'asc' } },
@@ -255,6 +253,12 @@ export default async function VersionDetailPage({
             <Button variant="secondary">Edytuj wersję</Button>
           </Link>
         )}
+        {/* Closed version: edit is off, deletion (ADMIN) lives on the edit page. */}
+        {closed && user.role === 'ADMIN' && (
+          <Link href={`/versions/${version.id}/edit`}>
+            <Button variant="ghost">Usuń wersję…</Button>
+          </Link>
+        )}
       </div>
 
       {closed && (
@@ -278,15 +282,25 @@ export default async function VersionDetailPage({
             szablonów.
           </p>
         ) : (
-          rows.map(({ task, resolved }) => (
-            <Card key={task.id} className="flex flex-col gap-2">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="font-medium text-fg">{resolved.name}</span>
+          // UI-1: one compact row per task; description in a tooltip (+ sr-only).
+          <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface shadow-sm">
+            {rows.map(({ task, resolved }) => (
+              <li
+                key={task.id}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2"
+              >
+                <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+                  <span
+                    className={cn(
+                      'font-medium text-fg',
+                      resolved.description && 'cursor-help underline decoration-dotted decoration-border underline-offset-4',
+                    )}
+                    title={resolved.description ?? undefined}
+                  >
+                    {resolved.name}
+                  </span>
                   {resolved.description && (
-                    <span className="text-sm text-muted">
-                      {resolved.description}
-                    </span>
+                    <span className="sr-only">{resolved.description}</span>
                   )}
                   <DeadlineLabel
                     releaseDate={version.releaseDate}
@@ -307,9 +321,17 @@ export default async function VersionDetailPage({
                   {resolved.taskType === 'TICKET_AGGREGATE' &&
                     (() => {
                       const t = ticketView(task)
+                      const note =
+                        t.mode === 'jira'
+                          ? 'z Jiry'
+                          : t.mode === 'jira-unsynced'
+                            ? 'Nie zsynchronizowano z Jirą'
+                            : t.mode === 'unmapped'
+                              ? 'Niepodpięta do Jira'
+                              : null
                       return (
-                        <div className="flex flex-col items-end gap-1">
-                          <TaskStatusBadge status={t.status} />
+                        <div className="flex items-center gap-3">
+                          {note && <span className="text-xs text-muted">{note}</span>}
                           {t.mode === 'manual-edit' ? (
                             <TicketCounterControl
                               versionTaskId={task.id}
@@ -322,82 +344,26 @@ export default async function VersionDetailPage({
                               {t.total === 0 ? '—' : `${t.current}/${t.total}`}
                             </span>
                           )}
-                          {t.mode === 'jira' && (
-                            <span className="text-xs text-muted">z Jiry</span>
-                          )}
-                          {t.mode === 'jira-unsynced' && (
-                            <span className="text-xs text-muted">Nie zsynchronizowano z Jirą</span>
-                          )}
-                          {t.mode === 'unmapped' && (
-                            <span className="text-xs text-muted">Niepodpięta do Jira</span>
-                          )}
+                          <TaskStatusBadge status={t.status} />
                         </div>
                       )
                     })()}
 
                   {resolved.taskType === 'INSTANCE_AGGREGATE' && (
                     <div
-                      className="flex cursor-default flex-col items-end gap-1"
+                      className="flex cursor-default items-center gap-3"
                       title="Status wyliczany z gotowości instancji"
                     >
-                      <TaskStatusBadge status={instanceAgg.status} />
                       <StepDots done={instanceAgg.done} total={instanceAgg.total} />
+                      <TaskStatusBadge status={instanceAgg.status} />
                     </div>
                   )}
                 </div>
-              </div>
-            </Card>
-          ))
+              </li>
+            ))}
+          </ul>
         )}
       </section>
-
-      {version.jiraVersionId && (
-        <section className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-semibold">Tickety Jira</h2>
-            <span className="font-mono text-sm text-muted">
-              {version.jiraVersionName}
-              {version.jiraSyncedAt
-                ? ` · ${jiraDone}/${jiraIssues.length} gotowych · synchronizacja ${whenFmt.format(version.jiraSyncedAt)}`
-                : ''}
-            </span>
-          </div>
-          {!version.jiraSyncedAt ? (
-            <p className="text-sm text-muted">
-              Tickety nie były jeszcze synchronizowane — administrator robi to w edycji wersji.
-            </p>
-          ) : sortedIssues.length === 0 ? (
-            <p className="text-sm text-muted">Brak ticketów w tej wersji Jira.</p>
-          ) : (
-            <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
-              {sortedIssues.map((i) => (
-                <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
-                  {jiraBrowseUrl ? (
-                    <a
-                      href={`${jiraBrowseUrl}${encodeURIComponent(i.key)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-mono text-fg underline underline-offset-2"
-                    >
-                      {i.key}
-                    </a>
-                  ) : (
-                    <span className="font-mono text-fg">{i.key}</span>
-                  )}
-                  <span className="min-w-0 flex-1 text-fg">{i.summary}</span>
-                  <span className="text-xs text-muted">{i.issueType}</span>
-                  {i.assigneeName && (
-                    <span className="text-xs text-muted">{i.assigneeName}</span>
-                  )}
-                  <StatusBadge status={JIRA_CATEGORY_BADGE[i.statusCategory] ?? 'neutral'}>
-                    {i.statusName}
-                  </StatusBadge>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Instancje</h2>
@@ -440,17 +406,63 @@ export default async function VersionDetailPage({
         )}
       </section>
 
-      {user.role === 'ADMIN' && (
-        <section className="flex flex-col gap-3 rounded-lg border border-fail-strong p-4">
-          <div>
-            <h2 className="text-lg font-semibold">Usuń wersję</h2>
-            <p className="mt-1 text-sm text-muted">
-              Usuwa wersję na stałe razem z zadaniami, instancjami, notatkami, komentarzami
-              i krokami. Tej operacji nie można cofnąć. W logu zmian zostanie wpis o usunięciu.
-            </p>
+      {version.jiraVersionId && (
+        // UI-1: collapsed by default, below comments; list scrolls inside.
+        <details className="group rounded-lg border border-border bg-surface shadow-sm">
+          <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-2 rounded-lg px-4 py-3 [&::-webkit-details-marker]:hidden">
+            <span className="flex items-center gap-2 text-lg font-semibold">
+              <span
+                aria-hidden="true"
+                className="inline-block text-sm text-muted transition-transform group-open:rotate-90 motion-reduce:transition-none"
+              >
+                ▶
+              </span>
+              Tickety Jira
+            </span>
+            <span className="font-mono text-sm text-muted">
+              {version.jiraVersionName}
+              {version.jiraSyncedAt
+                ? ` · ${jiraDone}/${jiraIssues.length} gotowych · synchronizacja ${whenFmt.format(version.jiraSyncedAt)}`
+                : ''}
+            </span>
+          </summary>
+          <div className="border-t border-border">
+            {!version.jiraSyncedAt ? (
+              <p className="px-4 py-3 text-sm text-muted">
+                Tickety nie były jeszcze synchronizowane — administrator robi to w edycji wersji.
+              </p>
+            ) : sortedIssues.length === 0 ? (
+              <p className="px-4 py-3 text-sm text-muted">Brak ticketów w tej wersji Jira.</p>
+            ) : (
+              <ul className="flex max-h-[60vh] flex-col divide-y divide-border overflow-y-auto">
+                {sortedIssues.map((i) => (
+                  <li key={i.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm">
+                    {jiraBrowseUrl ? (
+                      <a
+                        href={`${jiraBrowseUrl}${encodeURIComponent(i.key)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-fg underline underline-offset-2"
+                      >
+                        {i.key}
+                      </a>
+                    ) : (
+                      <span className="font-mono text-fg">{i.key}</span>
+                    )}
+                    <span className="min-w-0 flex-1 text-fg">{i.summary}</span>
+                    <span className="text-xs text-muted">{i.issueType}</span>
+                    {i.assigneeName && (
+                      <span className="text-xs text-muted">{i.assigneeName}</span>
+                    )}
+                    <StatusBadge status={JIRA_CATEGORY_BADGE[i.statusCategory] ?? 'neutral'}>
+                      {i.statusName}
+                    </StatusBadge>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-          <DeleteVersion versionId={version.id} versionName={version.name} />
-        </section>
+        </details>
       )}
     </main>
   )

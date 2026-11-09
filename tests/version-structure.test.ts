@@ -4,7 +4,7 @@ import type { Role, User } from '@prisma/client'
 const tx = {
   version: { findUnique: vi.fn(), delete: vi.fn() },
   taskTemplate: { findMany: vi.fn() },
-  versionTask: { createMany: vi.fn() },
+  versionTask: { createMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   changeLog: { create: vi.fn() },
 }
 
@@ -21,7 +21,7 @@ vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }))
 
 import { getSessionUser } from '@/lib/auth/session'
 import { redirect } from 'next/navigation'
-import { addVersionTasks, deleteVersion } from '@/app/actions/versions'
+import { addVersionTasks, deleteVersion, unpinVersionTask } from '@/app/actions/versions'
 import { AuthorizationError } from '@/lib/auth/roles'
 import { VersionClosedError } from '@/lib/versions/guard'
 
@@ -96,6 +96,78 @@ describe('addVersionTasks (reguła 6)', () => {
     await expect(
       addVersionTasks(form({ versionId: 'v1', templateId: 't1' })),
     ).rejects.toThrow('Szablon jest nieaktywny albo już jest w tej wersji')
+  })
+})
+
+describe('unpinVersionTask / restore (V-3)', () => {
+  it('PM dostaje odmowę', async () => {
+    mockedUser.mockResolvedValue(user('PM'))
+    await expect(unpinVersionTask(form({ taskId: 'vt1' }))).rejects.toBeInstanceOf(
+      AuthorizationError,
+    )
+    expect(tx.versionTask.update).not.toHaveBeenCalled()
+  })
+
+  it('zamknięta wersja → odmowa', async () => {
+    mockedUser.mockResolvedValue(user('TESTER'))
+    tx.versionTask.findUnique.mockResolvedValue({
+      id: 'vt1',
+      versionId: 'v1',
+      excludedAt: null,
+      version: { status: 'CANCELLED' },
+    })
+    await expect(unpinVersionTask(form({ taskId: 'vt1' }))).rejects.toBeInstanceOf(
+      VersionClosedError,
+    )
+    expect(tx.versionTask.update).not.toHaveBeenCalled()
+  })
+
+  it('odpięcie → excludedAt + wpis w logu, bez kasowania', async () => {
+    mockedUser.mockResolvedValue(user('TESTER'))
+    tx.versionTask.findUnique.mockResolvedValue({
+      id: 'vt1',
+      versionId: 'v1',
+      excludedAt: null,
+      version: { status: 'IN_PROGRESS' },
+    })
+    await unpinVersionTask(form({ taskId: 'vt1' }))
+    expect(tx.changeLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        entityType: 'VersionTask',
+        entityId: 'vt1',
+        field: 'pinned',
+        oldValue: 'true',
+        newValue: 'false',
+      }),
+    })
+    expect(tx.versionTask.update).toHaveBeenCalledWith({
+      where: { id: 'vt1' },
+      data: { excludedAt: expect.any(Date) },
+    })
+  })
+
+  it('dodanie odpiętego szablonu → przywrócenie, nie nowy wiersz', async () => {
+    mockedUser.mockResolvedValue(user('TESTER'))
+    tx.version.findUnique.mockResolvedValue({ status: 'IN_PROGRESS' })
+    tx.versionTask.findUnique.mockResolvedValue({ id: 'vt1', excludedAt: new Date() })
+    await addVersionTasks(form({ versionId: 'v1', templateId: 't1' }))
+    expect(tx.versionTask.update).toHaveBeenCalledWith({
+      where: { id: 'vt1' },
+      data: { excludedAt: null },
+    })
+    expect(tx.changeLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ field: 'pinned', newValue: 'true' }),
+    })
+    expect(tx.versionTask.createMany).not.toHaveBeenCalled()
+  })
+
+  it('dodanie szablonu już przypiętego → błąd', async () => {
+    mockedUser.mockResolvedValue(user('TESTER'))
+    tx.version.findUnique.mockResolvedValue({ status: 'IN_PROGRESS' })
+    tx.versionTask.findUnique.mockResolvedValue({ id: 'vt1', excludedAt: null })
+    await expect(
+      addVersionTasks(form({ versionId: 'v1', templateId: 't1' })),
+    ).rejects.toThrow('Zadanie już jest w tej wersji')
   })
 })
 

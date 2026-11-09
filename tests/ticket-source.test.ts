@@ -87,6 +87,7 @@ function task(version: { jiraVersionId: string | null; jiraSyncedAt: Date | null
     id: 't1',
     manualCounterCurrent: 0,
     manualCounterTotal: 0,
+    excludedAt: null as Date | null,
     version: { status: 'IN_PROGRESS', ...version },
     taskTemplate: { taskType: 'TICKET_AGGREGATE' },
   }
@@ -119,6 +120,16 @@ describe('setTicketCounters with Jira (J-4)', () => {
     )
     const res = await setTicketCounters('t1', 1, 2)
     expect(res).toHaveProperty('error')
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  it('unpinned task (V-3) → refused', async () => {
+    vi.mocked(prisma.versionTask.findUnique).mockResolvedValue({
+      ...task({ jiraVersionId: null, jiraSyncedAt: null }),
+      excludedAt: new Date(),
+    } as never)
+    const res = await setTicketCounters('t1', 1, 2)
+    expect(res).toEqual({ error: 'Nie znaleziono zadania' })
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 

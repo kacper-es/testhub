@@ -44,6 +44,11 @@ export const addVersionTasksSchema = z.object({
     .nullable(),
 })
 
+// Odpięcie zadania od wersji (V-3).
+export const unpinVersionTaskSchema = z.object({
+  taskId: z.string().min(1),
+})
+
 // Trwałe usunięcie wersji (ADMIN) — potwierdzenie przez wpisanie nazwy.
 export const deleteVersionSchema = z.object({
   versionId: z.string().min(1),

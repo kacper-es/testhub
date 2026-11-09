@@ -33,7 +33,7 @@ export default async function DashboardPage({
       where: { ...scopeWhere, ...appVersionWhere(appFilter) },
       orderBy: { releaseDate: 'asc' },
       include: {
-        tasks: { include: { taskTemplate: true } },
+        tasks: { where: { excludedAt: null }, include: { taskTemplate: true } },
         testRuns: { include: { values: true } },
         columns: { where: { excludedAt: null } },
         application: { select: APP_SELECT },

@@ -156,6 +156,8 @@ model VersionTask {
 
   completedById String?
   completedAt   DateTime?
+  // V-3: unpinned from the version (soft, restorable with its state).
+  excludedAt    DateTime?
   updatedAt     DateTime  @updatedAt
 
   nameSnapshot              String?

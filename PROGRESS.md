@@ -1378,6 +1378,69 @@ Dokumentacja wdrożenia: README → „Wdrożenie (Docker Swarm + Portainer)".
 
 ---
 
+## Krok UI-1 — Zwarty widok wersji `[x]`
+
+- [x] Checklista: jedna karta, jeden wiersz na zadanie (~44 px zamiast osobnej karty)
+- [x] Tickety Jira: pod Komentarzami, zwinięte (`<details>`), lista przewijana w środku
+- [x] Usuwanie wersji przeniesione z podglądu do edycji wersji
+
+### Decyzje
+
+- Opis zadania w dymku (`title`) na nazwie (kropkowane podkreślenie) + `sr-only` dla czytników.
+- Kolejność w wierszu: notka źródła → licznik/kropki → status (status zawsze z prawej).
+- Tickety: natywne `<details>` bez JS; nagłówek zwinięty pokazuje fixVersion, `x/y gotowych`
+  i czas synchronizacji; lista `max-h-[60vh]` z przewijaniem. Stan rozwinięcia przeżywa polling 5 s
+  (React nie kontroluje atrybutu `open`). Strzałka bez animacji przy `prefers-reduced-motion`.
+- Usuwanie: sekcja na dole edycji wersji (ADMIN). Wersja zamknięta nie ma edycji, więc ADMIN
+  widzi w podglądzie przycisk „Usuń wersję…" prowadzący na `/edit`, który dla zamkniętej wersji
+  renderuje tylko sekcję usuwania (TESTER nadal dostaje redirect).
+
+### Jak sprawdzić
+
+1. Wersja z 8–10 zadaniami → checklista mieści się na pół ekranu Full HD; najechanie na nazwę
+   pokazuje opis.
+2. Wersja podpięta do Jiry → „Tickety Jira" pod Komentarzami, zwinięte; po rozwinięciu lista
+   przewija się w ramce; po 5 s (polling) sekcja zostaje rozwinięta.
+3. Podgląd wersji nie ma sekcji „Usuń wersję"; jest na dole „Edytuj wersję" (ADMIN).
+4. Wersja zamknięta, ADMIN → „Usuń wersję…" w nagłówku → strona z samym usuwaniem.
+
+### Zweryfikowane
+
+- Lokalnie (docker): punkty 1–3 (40 testowych ticketów wstawionych ręcznie i usuniętych).
+  Punkt 4 niesprawdzony — brak zamkniętej wersji w lokalnej bazie.
+
+---
+
+## Krok V-3 — Odpinanie zadań od wersji `[x]`
+
+- [x] `VersionTask.excludedAt` + migracja `20261109120000_version_task_excluded`
+- [x] Akcja `unpinVersionTask` (TESTER/ADMIN, otwarta wersja, `logChange` field `pinned`)
+- [x] `addVersionTasks` z `templateId` przywraca odpięte zadanie (stan wraca) zamiast tworzyć nowe
+- [x] Edycja wersji → „Zadania": lista przypiętych z „Odepnij"; odpięte w selekcie jako „(odpięte — przywróć)"
+- [x] Odpięte zadania pominięte: podgląd wersji, dashboard (karta + status), licznik na liście wersji;
+      akcje statusu/liczników odmawiają na odpiętym zadaniu
+
+### Decyzje
+
+- Soft, jak przy instancjach (zero hard delete); status i liczniki zostają w wierszu.
+- W przeciwieństwie do odpinania instancji — wpis w `ChangeLog` (`pinned`: tak/nie), bo zmienia
+  zakres checklisty wersji.
+- „Dodaj wszystkie brakujące" nie przywraca odpiętych — odpięcie było świadome, przywraca się pojedynczo.
+- Snapshoty przy zamknięciu wersji obejmują też odpięte zadania (nieszkodliwe, niewidoczne).
+- Przy okazji: licznik instancji na liście wersji pomija odpięte instancje (wcześniej liczył wszystkie).
+
+### Jak sprawdzić
+
+1. Edytuj wersję → Zadania → „Odepnij" → zadanie znika z checklisty i z karty na dashboardzie.
+2. Select „Dodaj zadanie z szablonu" → „(odpięte — przywróć)" → „Dodaj" → zadanie wraca z poprzednim statusem.
+3. Panel administratora → Log zmian → dwa wpisy „przypięte do wersji" (tak → nie, nie → tak).
+
+### Zweryfikowane
+
+- Lokalnie (docker): punkty 1–3; testy 116/116.
+
+---
+
 ## Krok J-4 — Tickety w wersji i licznik z Jiry `[x]`
 
 - [x] `lib/versions/ticket-source.ts` — tryb źródła liczb dla `TICKET_AGGREGATE`

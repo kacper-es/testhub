@@ -13,6 +13,7 @@ import {
   cancelVersionSchema,
   createVersionSchema,
   deleteVersionSchema,
+  unpinVersionTaskSchema,
   updateVersionSchema,
 } from '@/lib/validation/version'
 
@@ -338,10 +339,12 @@ export async function updateVersion(
 
 // "Add task from template" (rule 6): the task set is frozen at creation (rule 5);
 // this is the escape hatch for templates created later. Open versions only.
-// Empty templateId = every active template missing from the version.
-// No ChangeLog entry — rule 27 does not cover it (same as attaching an instance).
+// templateId given: restores the task if it was unpinned (V-3, state comes back),
+// otherwise creates it from an active template.
+// Empty templateId = every active template never present in the version
+// (unpinned tasks are restored one by one, on purpose).
 export async function addVersionTasks(formData: FormData): Promise<void> {
-  await requireRole(['TESTER', 'ADMIN'])
+  const user = await requireRole(['TESTER', 'ADMIN'])
   const parsed = addVersionTasksSchema.safeParse({
     versionId: formData.get('versionId'),
     templateId: formData.get('templateId') ?? '',
@@ -358,6 +361,30 @@ export async function addVersionTasks(formData: FormData): Promise<void> {
     })
     if (!version) throw new Error('Nie znaleziono wersji')
     assertVersionEditable(version.status)
+
+    if (templateId) {
+      const existing = await tx.versionTask.findUnique({
+        where: { versionId_taskTemplateId: { versionId, taskTemplateId: templateId } },
+        select: { id: true, excludedAt: true },
+      })
+      if (existing) {
+        if (existing.excludedAt === null) throw new Error('Zadanie już jest w tej wersji')
+        await logChange(tx, {
+          entityType: 'VersionTask',
+          entityId: existing.id,
+          versionId,
+          field: 'pinned',
+          oldValue: 'false',
+          newValue: 'true',
+          userId: user.id,
+        })
+        await tx.versionTask.update({
+          where: { id: existing.id },
+          data: { excludedAt: null },
+        })
+        return
+      }
+    }
 
     const missing = await tx.taskTemplate.findMany({
       where: {
@@ -380,6 +407,46 @@ export async function addVersionTasks(formData: FormData): Promise<void> {
 
   revalidatePath(`/versions/${versionId}`)
   revalidatePath(`/versions/${versionId}/edit`)
+  revalidatePath('/')
+}
+
+// Unpin a task from the version (V-3) — soft, via excludedAt (zero hard delete).
+// Status and counters stay and come back on restore. Open versions only.
+export async function unpinVersionTask(formData: FormData): Promise<void> {
+  const user = await requireRole(['TESTER', 'ADMIN'])
+  const parsed = unpinVersionTaskSchema.safeParse({ taskId: formData.get('taskId') })
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane')
+  }
+
+  const versionId = await prisma.$transaction(async (tx) => {
+    const task = await tx.versionTask.findUnique({
+      where: { id: parsed.data.taskId },
+      select: { id: true, versionId: true, excludedAt: true, version: { select: { status: true } } },
+    })
+    if (!task) throw new Error('Nie znaleziono zadania')
+    assertVersionEditable(task.version.status)
+    if (task.excludedAt !== null) return task.versionId
+
+    await logChange(tx, {
+      entityType: 'VersionTask',
+      entityId: task.id,
+      versionId: task.versionId,
+      field: 'pinned',
+      oldValue: 'true',
+      newValue: 'false',
+      userId: user.id,
+    })
+    await tx.versionTask.update({
+      where: { id: task.id },
+      data: { excludedAt: new Date() },
+    })
+    return task.versionId
+  })
+
+  revalidatePath(`/versions/${versionId}`)
+  revalidatePath(`/versions/${versionId}/edit`)
+  revalidatePath('/versions')
   revalidatePath('/')
 }
 

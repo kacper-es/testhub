@@ -3,16 +3,19 @@ import { Button } from '@/components/ui/Button'
 
 export type MissingTemplate = { id: string; name: string }
 
-// „Dodaj zadanie z szablonu" (reguła 6): aktywne szablony nieobecne w wersji.
+// „Dodaj zadanie z szablonu" (reguła 6): aktywne szablony nieobecne w wersji
+// oraz zadania odpięte (V-3) — wybór odpiętego przywraca je z danymi.
 // Formularze server action, bez JS klienta (jak AttachInstance).
 export function AddVersionTasks({
   versionId,
   missing,
+  unpinned,
 }: {
   versionId: string
   missing: MissingTemplate[]
+  unpinned: MissingTemplate[]
 }) {
-  if (missing.length === 0) {
+  if (missing.length === 0 && unpinned.length === 0) {
     return (
       <p className="text-sm text-muted">
         Wszystkie aktywne szablony są już w tej wersji.
@@ -38,6 +41,11 @@ export function AddVersionTasks({
             {missing.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
+              </option>
+            ))}
+            {unpinned.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name} (odpięte — przywróć)
               </option>
             ))}
           </select>

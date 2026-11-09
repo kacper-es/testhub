@@ -20,7 +20,10 @@ import {
   type JiraVersionOption,
 } from '@/components/versions/VersionJiraForm'
 import { AddVersionTasks } from '@/components/versions/AddVersionTasks'
+import { unpinVersionTask } from '@/app/actions/versions'
+import { resolveTask } from '@/lib/versions/resolve-task'
 import { VersionJiraSync } from '@/components/versions/VersionJiraSync'
+import { DeleteVersion } from '@/components/versions/DeleteVersion'
 
 const syncFmt = new Intl.DateTimeFormat('pl-PL', {
   dateStyle: 'medium',
@@ -59,8 +62,37 @@ export default async function EditVersionPage({
   })
   if (!version) notFound()
 
+  const deleteSection =
+    user.role === 'ADMIN' ? (
+      <section className="flex flex-col gap-3 rounded-lg border border-fail-strong p-4">
+        <div>
+          <h2 className="text-lg font-semibold">Usuń wersję</h2>
+          <p className="mt-1 text-sm text-muted">
+            Usuwa wersję na stałe razem z zadaniami, instancjami, notatkami, komentarzami
+            i krokami. Tej operacji nie można cofnąć. W logu zmian zostanie wpis o usunięciu.
+          </p>
+        </div>
+        <DeleteVersion versionId={version.id} versionName={version.name} />
+      </section>
+    ) : null
+
   // Edycja tylko na otwartej wersji (read-only na zamkniętej, reguła 12).
-  if (version.status !== 'IN_PROGRESS') redirect(`/versions/${id}`)
+  // Wyjątek: ADMIN widzi tu samo usuwanie zamkniętej wersji (UI-1).
+  if (version.status !== 'IN_PROGRESS') {
+    if (!deleteSection) redirect(`/versions/${id}`)
+    return (
+      <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
+        <div>
+          <h1 className="text-2xl font-semibold">Usuń wersję</h1>
+          <p className="mt-1 font-mono text-sm text-muted">{version.name}</p>
+          <p className="mt-2 text-sm text-muted">
+            Wersja jest zamknięta — edycja jest wyłączona, dostępne jest tylko usunięcie.
+          </p>
+        </div>
+        {deleteSection}
+      </main>
+    )
+  }
 
   // Sekcja Jira tylko dla ADMIN (mapowanie zarządzane przez admina).
   const jira = user.role === 'ADMIN' ? await loadJiraSection(version) : null
@@ -141,15 +173,26 @@ export default async function EditVersionPage({
     jiraSyncText = `Ostatnia synchronizacja: ${syncFmt.format(version.jiraSyncedAt)} · ${total} ticketów, ${done} gotowych`
   }
 
-  // Zadania (reguła 6): aktywne szablony nieobecne w wersji — do dołożenia.
-  const [taskCount, missingTemplates] = await Promise.all([
-    prisma.versionTask.count({ where: { versionId: id } }),
+  // Zadania (reguła 6, V-3): przypięte (do odpięcia), odpięte (do przywrócenia)
+  // i aktywne szablony nigdy nieobecne w wersji (do dołożenia).
+  const [versionTasks, missingTemplates] = await Promise.all([
+    prisma.versionTask.findMany({
+      where: { versionId: id },
+      include: { taskTemplate: true },
+    }),
     prisma.taskTemplate.findMany({
       where: { isActive: true, versionTasks: { none: { versionId: id } } },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true },
     }),
   ])
+  const resolvedTasks = versionTasks
+    .map((t) => ({ task: t, resolved: resolveTask(t, t.taskTemplate, version.status) }))
+    .sort((a, b) => a.resolved.sortOrder - b.resolved.sortOrder)
+  const pinnedTasks = resolvedTasks.filter((r) => r.task.excludedAt === null)
+  const unpinnedTasks = resolvedTasks
+    .filter((r) => r.task.excludedAt !== null)
+    .map((r) => ({ id: r.task.taskTemplateId, name: r.resolved.name }))
 
   return (
     <main className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
@@ -225,11 +268,34 @@ export default async function EditVersionPage({
         <div>
           <h2 className="text-lg font-semibold">Zadania</h2>
           <p className="mt-1 text-sm text-muted">
-            Zestaw zadań powstaje przy tworzeniu wersji ({taskCount} w tej wersji). Szablony
-            dodane później można dołożyć tutaj.
+            Zadania tej wersji. Odpięcie chowa zadanie (status i liczniki zostają i wrócą
+            po ponownym dodaniu).
           </p>
         </div>
-        <AddVersionTasks versionId={version.id} missing={missingTemplates} />
+
+        {pinnedTasks.length === 0 ? (
+          <p className="text-sm text-muted">Brak przypiętych zadań.</p>
+        ) : (
+          <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-surface">
+            {pinnedTasks.map(({ task, resolved }) => (
+              <li key={task.id} className="flex items-center justify-between gap-3 px-4 py-1.5">
+                <span className="text-fg">{resolved.name}</span>
+                <form action={unpinVersionTask}>
+                  <input type="hidden" name="taskId" value={task.id} />
+                  <Button variant="ghost" type="submit" className="text-fail-strong">
+                    Odepnij
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <AddVersionTasks
+          versionId={version.id}
+          missing={missingTemplates}
+          unpinned={unpinnedTasks}
+        />
       </section>
 
       <section className="flex flex-col gap-3">
@@ -303,6 +369,8 @@ export default async function EditVersionPage({
           )}
         </section>
       )}
+
+      {deleteSection}
     </main>
   )
 }

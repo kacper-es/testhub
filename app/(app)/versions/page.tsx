@@ -45,7 +45,12 @@ export default async function VersionsPage({
       where: appVersionWhere(appFilter),
       orderBy: [{ status: 'asc' }, { releaseDate: 'asc' }],
       include: {
-        _count: { select: { tasks: true, testRuns: true } },
+        _count: {
+          select: {
+            tasks: { where: { excludedAt: null } },
+            testRuns: { where: { excludedAt: null } },
+          },
+        },
         application: {
           select: {
             id: true,
