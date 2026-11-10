@@ -1,5 +1,7 @@
 import type { Instance, InstanceTestRun } from '@prisma/client'
 import { FlagCheckbox } from '@/components/versions/FlagCheckbox'
+import { InfoPopover } from '@/components/ui/InfoPopover'
+import { ClampText } from '@/components/ui/ClampText'
 import { cn } from '@/lib/cn'
 
 type Run = InstanceTestRun & { instance: Instance }
@@ -28,11 +30,24 @@ function tooltip(
   return last ? `${base}: ${last.user}, ${last.when}` : base
 }
 
-function InstanceName({ instance }: { instance: Instance }) {
+// UI-5: key functionalities — ⓘ bubble on desktop, clamped text under the name on mobile.
+function InstanceName({ instance, mobile }: { instance: Instance; mobile?: boolean }) {
+  const key = instance.keyFunctionalities.trim()
   return (
     <span className="flex flex-col">
-      <span className="font-medium text-fg">{instance.name}</span>
+      <span className="flex items-center gap-1.5">
+        <span className="font-medium text-fg">{instance.name}</span>
+        {key && !mobile && (
+          <InfoPopover label={`Kluczowe funkcjonalności: ${instance.name}`}>
+            <span className="mb-1 block font-mono text-[10px] uppercase tracking-[0.1em] text-muted">
+              Kluczowe funkcjonalności
+            </span>
+            {key}
+          </InfoPopover>
+        )}
+      </span>
       {instance.clientName && <span className="text-xs text-muted">{instance.clientName}</span>}
+      {key && mobile && <ClampText text={key} className="mt-1" />}
     </span>
   )
 }
@@ -140,7 +155,7 @@ export function InstanceRunsTable({
             key={run.id}
             className="flex flex-col gap-3 rounded-[4px] border border-border bg-bg p-3"
           >
-            <InstanceName instance={run.instance} />
+            <InstanceName instance={run.instance} mobile />
             {columns.length > 0 && (
               <div className="flex flex-col gap-2">
                 {columns.map((c) => (

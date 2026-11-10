@@ -1858,6 +1858,61 @@ zablokowana przez `@unique` także po anulowaniu). Świadomy wyjątek od „Zero
 
 ---
 
+## Krok UI-5 — Kluczowe funkcjonalności instancji w widoku wersji `[x]`
+
+- [x] `components/ui/InfoPopover.tsx` (klient): przycisk ⓘ + dymek `role="tooltip"`; hover/focus pokazuje, klik przypina (dotyk), Esc / klik obok / scroll zamyka; portal + `position: fixed`, więc tabela z poziomym scrollem go nie przycina
+- [x] `components/ui/ClampText.tsx` (klient): tekst ucięty do 2 linii, „więcej / mniej" tylko gdy tekst się nie mieści
+- [x] `InstanceRunsTable`: ⓘ przy nazwie instancji (desktop), tekst pod nazwą z `ClampText` (karty na telefonie)
+- [x] Edycja wersji, lista podpiętych instancji: ⓘ przy nazwie
+
+### Decyzje
+
+- Bez natywnego `title` — nie działa na dotyku i z klawiatury, źle pokazuje dłuższy tekst z nowymi liniami.
+- Puste `keyFunctionalities` (po `trim`) → brak ikony.
+- Bez animacji dymka (nic do wyłączania przy `prefers-reduced-motion`).
+
+### Odłożone
+
+- Brak.
+
+### Jak sprawdzić
+
+- `npm run check` ✔, `npx vitest run` 318/318.
+- Strona wersji (desktop): najechanie na ⓘ przy instancji → dymek z tekstem (z nowymi liniami); klik → zostaje po zjechaniu myszą; Esc / klik obok → znika; Tab na ⓘ → dymek.
+- Wąskie okno (< 768 px): karty instancji mają tekst pod nazwą, 2 linie + „więcej".
+- Edycja wersji → sekcja „Instancje": ⓘ przy nazwie.
+
+---
+
+## Krok J-7 — Tickety Jira według typu `[x]`
+
+- [x] Migracja `20261110120000_jira_tracked_types`: model `JiraTrackedType` (`name` @id, `isActive`, `updatedAt`, `updatedById`)
+- [x] `lib/jira/issue-types.ts`: `groupIssuesByType` (wybrane typy w zadanej kolejności + „Inne" z liczbą typów), `trackedTypeOptions` (typy z ticketów ∪ wybrane, alfabetycznie, z liczbą)
+- [x] Akcja `setJiraTrackedTypes` (ADMIN, zod `jiraTrackedTypesSchema`, transakcja: odznaczone → `isActive=false`, zaznaczone → upsert)
+- [x] Admin → Jira: sekcja „Typy ticketów w podziale" — checkboxy z liczbą ticketów (bez usuniętych z fixVersion)
+- [x] Panel Jira wersji: „Według typu" — wiersz na typ (`<details>`: gotowe/wszystkie, cienki pasek, lista ticketów po rozwinięciu), „Inne (N typów)" na końcu; ADMIN bez wybranych typów widzi link do Admin → Jira
+- [x] Testy `tests/jira-types.test.ts` (9)
+
+### Decyzje
+
+- Typy wybiera ADMIN w aplikacji (nie env) — wybór z typów faktycznie widzianych w synchronizacji, bez wpisywania nazw.
+- Pozostałe typy zwinięte jako „Inne"; pasek, liczniki, burn-up i agregaty zadań dalej liczą wszystkie tickety.
+- Dopasowanie nazwy typu dokładne (wielkość liter jak w Jirze).
+- Bez wpisu w `ChangeLog` — to globalna konfiguracja admina, nie dane wersji (reguła 27, jak podpięcie aplikacji do projektu Jira); ostatni edytujący w `updatedById`.
+- Wybrany typ bez ticketów w wersji ma wiersz 0/0 („Brak ticketów tego typu") — widać, że go nie ma.
+- Synchronizacja bez zmian — `issueType` był już zapisywany od J-3.
+
+### Odłożone
+
+- Kolejność typów ustawiana ręcznie (na razie alfabetycznie).
+
+### Jak sprawdzić
+
+- `npm run check` ✔, `npx vitest run` 327/327.
+- Docker: migracja przy starcie kontenera. Wersja z 16 tymczasowymi ticketami (6 typów) → panel bez podziału, ADMIN widzi link „Admin → Jira"; Admin → Jira: 6 typów z liczbami; zaznaczenie Bug prod, Improvement, New feature → „Zapisano."; panel wersji: Bug prod 1/4, Improvement 1/2, New feature 0/2, Inne (3 typy) 3/8; rozwinięcie wiersza → lista ticketów tego typu. Dane testowe usunięte.
+
+---
+
 ## Backlog (po MVP)
 
 - **Rozbudowa kont, ról i uprawnień.** Na razie zostają 3 role (TESTER/PM/ADMIN), a integracją

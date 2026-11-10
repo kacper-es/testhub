@@ -12,7 +12,7 @@ i pełny audyt zmian w jednym miejscu. Dla 4 testerów QA i 3 PM-ów.
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=flat-square&logo=postgresql&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)
-![tests](https://img.shields.io/badge/testy-318%20passing-3B6D11?style=flat-square)
+![tests](https://img.shields.io/badge/testy-327%20passing-3B6D11?style=flat-square)
 
 [Specyfikacja](PROMPT-release-hub-mvp.md) ·
 [Reguły projektu](CLAUDE.md) ·

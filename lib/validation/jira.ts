@@ -24,6 +24,14 @@ export const versionJiraSchema = z.object({
     .transform((v) => (v === '' ? null : v)),
 })
 
+// Typy ticketów w podziale (J-7): nazwy typów z Jiry, bez duplikatów.
+export const jiraTrackedTypesSchema = z.object({
+  types: z
+    .array(z.string().trim().min(1).max(100, 'Za długa nazwa typu'))
+    .max(50, 'Za dużo typów')
+    .transform((list) => [...new Set(list)]),
+})
+
 // Synchronizacja ticketów jednej wersji (J-3).
 export const jiraSyncSchema = z.object({
   versionId: z.string().min(1),

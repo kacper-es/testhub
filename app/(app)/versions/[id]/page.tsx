@@ -31,6 +31,7 @@ import { buildBurnup, buildTimeline } from '@/lib/versions/overview'
 import { FIELD_LABEL, displayValue } from '@/lib/versions/changelog-labels'
 import { ReleaseTimeline } from '@/components/versions/ReleaseTimeline'
 import { JiraPanel } from '@/components/versions/JiraPanel'
+import { groupIssuesByType } from '@/lib/jira/issue-types'
 import { EventLog, type EventLogEntry } from '@/components/versions/EventLog'
 
 // Ostatnia zmiana każdej flagi/notatki, jednym zapytaniem DISTINCT ON (reguła 4 —
@@ -244,6 +245,18 @@ export default async function VersionDetailPage({
       a.key.localeCompare(b.key, undefined, { numeric: true }),
   )
   const jiraDone = jiraIssues.filter((i) => i.statusCategory === 'done').length
+  // J-7: breakdown by the issue types chosen in Admin → Jira.
+  const trackedTypes = version.jiraVersionId
+    ? (
+        await prisma.jiraTrackedType.findMany({
+          where: { isActive: true },
+          select: { name: true },
+          orderBy: { name: 'asc' },
+        })
+      ).map((t) => t.name)
+    : []
+  const jiraBreakdown =
+    trackedTypes.length > 0 ? groupIssuesByType(sortedIssues, trackedTypes) : null
   const ticketView = (task: { manualCounterCurrent: number; manualCounterTotal: number }) =>
     ticketTaskView({
       versionStatus: version.status,
@@ -603,6 +616,8 @@ export default async function VersionDetailPage({
               issues={sortedIssues}
               burnup={burnup}
               browseUrl={jiraBrowseUrl}
+              breakdown={jiraBreakdown}
+              typesHint={user.role === 'ADMIN'}
             />
           )}
 

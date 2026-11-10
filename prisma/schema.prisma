@@ -359,3 +359,12 @@ model JiraSnapshot {
 
   @@unique([versionId, day])
 }
+
+// J-7: Jira issue types shown as a separate breakdown in the version's Jira panel.
+// Chosen by ADMIN; unchecking sets isActive=false (no hard delete).
+model JiraTrackedType {
+  name        String   @id // issuetype name exactly as in Jira, e.g. "Bug prod"
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+}

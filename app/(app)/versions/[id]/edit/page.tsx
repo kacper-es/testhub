@@ -34,6 +34,7 @@ import { readJiraConfig } from '@/lib/jira/config'
 import { getProjectVersions, JiraError } from '@/lib/jira/client'
 import { selectableJiraVersions } from '@/lib/jira/versions'
 import { EditVersionForm } from './edit-version-form'
+import { InfoPopover } from '@/components/ui/InfoPopover'
 
 export default async function EditVersionPage({
   params,
@@ -144,7 +145,7 @@ export default async function EditVersionPage({
   // Instancje wersji: aktywne runy (do odpięcia) + opcje podpięcia (reguła 20).
   const testRuns = await prisma.instanceTestRun.findMany({
     where: { versionId: id },
-    include: { instance: { select: { name: true } } },
+    include: { instance: { select: { name: true, keyFunctionalities: true } } },
     orderBy: { instance: { name: 'asc' } },
   })
   const activeRuns = testRuns.filter((r) => r.excludedAt === null)
@@ -314,7 +315,14 @@ export default async function EditVersionPage({
             {activeRuns.map((r) => (
               <li key={r.id}>
                 <Card className="flex items-center justify-between gap-3 py-2">
-                  <span className="text-fg">{r.instance.name}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="text-fg">{r.instance.name}</span>
+                    {r.instance.keyFunctionalities.trim() && (
+                      <InfoPopover label={`Kluczowe funkcjonalności: ${r.instance.name}`}>
+                        {r.instance.keyFunctionalities.trim()}
+                      </InfoPopover>
+                    )}
+                  </span>
                   <form action={unpinInstanceRun}>
                     <input type="hidden" name="runId" value={r.id} />
                     <Button variant="ghost" type="submit" className="text-fail-strong">

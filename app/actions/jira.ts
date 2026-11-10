@@ -8,7 +8,12 @@ import { readJiraConfig, type JiraConfig } from '@/lib/jira/config'
 import { getMyself, getProject, getProjectVersions, JiraError } from '@/lib/jira/client'
 import { assertVersionEditable } from '@/lib/versions/guard'
 import { logChange } from '@/lib/versions/log-change'
-import { applicationJiraSchema, jiraSyncSchema, versionJiraSchema } from '@/lib/validation/jira'
+import {
+  applicationJiraSchema,
+  jiraSyncSchema,
+  jiraTrackedTypesSchema,
+  versionJiraSchema,
+} from '@/lib/validation/jira'
 import { syncAllOpenVersions, syncErrorMessage, syncOneVersion } from '@/lib/jira/sync-version'
 
 export type JiraTestState =
@@ -292,3 +297,42 @@ export async function syncAllOpenJiraVersions(
   }
 }
 
+
+export type JiraTrackedTypesState = { error?: string; saved?: boolean }
+
+// J-7: issue types shown as a breakdown in the version's Jira panel — ADMIN only.
+// Unchecked types get isActive=false (no hard delete). Global admin configuration,
+// not version data, so no ChangeLog entry (rule 27 — like application settings);
+// the last editor is kept in updatedById.
+export async function setJiraTrackedTypes(
+  _prev: JiraTrackedTypesState,
+  formData: FormData,
+): Promise<JiraTrackedTypesState> {
+  const user = await requireRole(['ADMIN'])
+
+  const parsed = jiraTrackedTypesSchema.safeParse({
+    types: formData.getAll('types').map(String),
+  })
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? 'Nieprawidłowe dane' }
+  }
+  const types = parsed.data.types
+
+  await prisma.$transaction(async (tx) => {
+    await tx.jiraTrackedType.updateMany({
+      where: { isActive: true, name: { notIn: types } },
+      data: { isActive: false, updatedById: user.id },
+    })
+    for (const name of types) {
+      await tx.jiraTrackedType.upsert({
+        where: { name },
+        create: { name, updatedById: user.id },
+        update: { isActive: true, updatedById: user.id },
+      })
+    }
+  })
+
+  revalidatePath('/admin/jira')
+  revalidatePath('/versions', 'layout')
+  return { saved: true }
+}

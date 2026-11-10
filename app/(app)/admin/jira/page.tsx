@@ -4,6 +4,9 @@ import { Card } from '@/components/ui/Card'
 import { JiraConnectionTest } from '@/components/admin/JiraConnectionTest'
 import { JiraSyncAll } from '@/components/admin/JiraSyncAll'
 import { lastAutoSyncRun, readSyncInterval } from '@/lib/jira/auto-sync'
+import { prisma } from '@/lib/prisma'
+import { trackedTypeOptions } from '@/lib/jira/issue-types'
+import { JiraTrackedTypes } from '@/components/admin/JiraTrackedTypes'
 
 const runFmt = new Intl.DateTimeFormat('pl-PL', {
   dateStyle: 'medium',
@@ -21,6 +24,20 @@ export default async function JiraAdminPage() {
   const cfg = readJiraConfig()
   const interval = readSyncInterval()
   const lastRun = lastAutoSyncRun()
+
+  // J-7: types seen in synced tickets (current ones only) + tracked types.
+  const [seen, active] = await Promise.all([
+    prisma.jiraIssue.groupBy({
+      by: ['issueType'],
+      where: { removedAt: null },
+      _count: { _all: true },
+    }),
+    prisma.jiraTrackedType.findMany({ where: { isActive: true }, select: { name: true } }),
+  ])
+  const typeOptions = trackedTypeOptions(
+    seen.map((s) => ({ issueType: s.issueType, count: s._count._all })),
+    active.map((a) => a.name),
+  )
 
   return (
     <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-4 py-6 sm:px-8">
@@ -124,6 +141,18 @@ export default async function JiraAdminPage() {
           )}
         </div>
         <JiraSyncAll disabled={cfg.status !== 'configured'} />
+      </Card>
+
+      <Card className="flex flex-col gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Typy ticketów w podziale</h2>
+          <p className="mt-1 text-sm text-muted">
+            Zaznaczone typy mają osobne wiersze w panelu Jira każdej wersji; pozostałe są
+            zwinięte jako „Inne&rdquo;. Liczby to tickety we wszystkich wersjach. Postęp
+            i burn-up dalej liczą wszystkie tickety.
+          </p>
+        </div>
+        <JiraTrackedTypes options={typeOptions} />
       </Card>
     </main>
   )
